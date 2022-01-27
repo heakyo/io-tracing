@@ -39,7 +39,10 @@ pid$target::IopIrpDispatch:entry,
 pid$target::IopIrpDispatch:return,
 
 pid$target::IoFmIrpDispatchContinue:entry,
-pid$target::IoFmIrpDispatchContinue:return,
+/*pid$target::IoFmIrpDispatchContinue:return,*/
+
+pid$target::IopIrpCompleteInternal:entry,
+pid$target::IopIrpCompleteInternal:return,
 
 pid$target::IopFmIrpStateDispatchFsdExec:entry,
 pid$target::IopFmIrpStateDispatchFsdExec:return,
@@ -68,7 +71,8 @@ pid$target::OneFS_lwext_write:return,
 syscall:freebsd:lwextsvc_write:entry,
 syscall:freebsd:lwextsvc_write:return
 {
-	printf("pname:%s(%d) tname:%s(%d)", execname, pid, curthread->td_name, tid);
+	/*printf("pname:%s(%d) tname:%s(%d)", execname, pid, curthread->td_name, tid);*/
+	/*printf("timestamp:%d", timestamp);*/
 }
 
 /*entry**************************************************************************************/
@@ -77,14 +81,15 @@ pid$target:nfs.so:NfsSocketProcessTask:entry
 
 pid$target:nfs.so:NfsProtoNfs3CallDispatch:entry
 {
-	printf(" ");
+	printf("pname:%s(%d) tname:%s(%d)", execname, pid, curthread->td_name, tid);
 }
 
 pid$target:nfs.so:NfsProtoNfs3Dispatch:entry
 {
 	this->pExecContext = (struct _NFS_EXEC_CONTEXT *)arg0;
 
-	printf("pExecContext:%p\n", this->pExecContext);
+	printf("pname:%s(%d) tname:%s(%d) ", execname, pid, curthread->td_name, tid);
+	printf("pExecContext:%p ", this->pExecContext);
 	/*printf("\t\t\t\t\t\t|->\n");*/
 	/*printf("NfsProc:%d", this->pExecContext->RpcProcedure);*/
 }
@@ -94,32 +99,56 @@ pid$target:nfs.so:NfsStatsOpBegin:entry
 {
 	/* arg3<-->operation: WRITE. REF: _NFS3_OP_RECORD_STAT */
 
-	this->stats_op_delta = (struct isp_op_delta *)arg1;
+	self->pExecContext = arg0;
+	this->stats_op_delta = arg1;
 	this->protocol = arg2;
 	this->operation = arg3;
 	/*@[execname, pid, stack()] = count();*/
 
+	printf("pExecContext:%p ", self->pExecContext);
+	printf("delta:%p ", this->stats_op_delta);
 	printf("protocol:%d ", this->protocol);
-	printf("operation:%d", this->operation);
+	printf("operation:%d ", this->operation);
+	printf("timestamp:%d", timestamp);
 
-	if (1) {
+	if (0) {
 		ustack();
 	}
 }
 
-pid$target:nfs.so:NfsStatsOpEnd:entry
+ISP_OP_END:entry
 {
+	this->d = args[0];
+
+	printf("enabled:%x ", this->d->enabled);
+}
+
+isp_op_end_:entry
+{
+	this->delta = args[0];
+
+	printf("exec:%s delta:%p ", execname, this->delta);
+	printf("enabled:%x ", this->delta->enabled);
+	printf("timestamp:%d begin:%d ", timestamp, this->delta->begin);
 }
 
 /*return*************************************************************************************/
 
-pid$target:nfs.so:NfsStatsOpEnd:return
+isp_op_end_:return
 {
 }
+
+ISP_OP_END:return
+{}
 
 pid$target:nfs.so:NfsStatsOpBegin:return
 /this->operation == 7/
 {
+}
+
+pid$target::IoFmIrpDispatchContinue:return
+{
+	printf("status:%x", arg1);
 }
 
 pid$target:nfs.so:NfsProtoNfs3Dispatch:return
