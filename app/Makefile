@@ -2,10 +2,10 @@ CFLAGS = -O0 -g
 
 all: main
 	objdump -dS main > main.dis
-	#cp -a main /usr/local/bin
+	cp -a main /usr/local/bin
 
 main: main.o
-	$(CC) -o $@ $<
+	$(CC) $(CFLAGS) -o $@ $<
 
 main.o: main.i
 	$(CC) $(CFLAGS) -c -o $@ $<
