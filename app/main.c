@@ -1,4 +1,6 @@
+#define _GNU_SOURCE
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <getopt.h>
@@ -6,7 +8,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define BUFSZ 64
+#define BUFSZ 4096
 
 void usage()
 {
@@ -24,7 +26,8 @@ int main(int argc, char *argv[])
 	char dev[32];
 	int wr, rd;
 	int fd, ret;
-	char rdbuf[BUFSZ], wrbuf[BUFSZ];
+	char rdbuf[BUFSZ];
+	char *aligned_wrbuf;
 
 	char ch;
 	char *short_opts = "wr";
@@ -56,18 +59,24 @@ int main(int argc, char *argv[])
 		usage();
 	}
 
+	ret = posix_memalign((void **)&aligned_wrbuf, BUFSZ, BUFSZ);
+	if (ret) {
+		printf("posix_memalign failed! %s\n", strerror(ret));
+		return -1;
+	}
+
 	strcpy(dev, argv[optind]);
-	fd = open(dev, O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+	fd = open(dev, O_RDWR | O_CREAT | O_SYNC | O_DIRECT, S_IRWXU | S_IRWXG | S_IRWXO);
 	if (fd == -1) {
 		perror("open failed.");
 		return -1;
 	}
 
 	memset(rdbuf, 0x0, sizeof(rdbuf));
-	memset(wrbuf, 0xa5, sizeof(wrbuf));
+	memset(aligned_wrbuf, 0xa5, BUFSZ);
 
 	if (wr) {
-		ret = write(fd, wrbuf, sizeof(wrbuf));
+		ret = write(fd, aligned_wrbuf, BUFSZ);
 		if (ret == -1) {
 			perror("write failed.");
 			return ret;
@@ -83,6 +92,8 @@ int main(int argc, char *argv[])
 	}
 
 	close(fd);
+
+	free(aligned_wrbuf);
 
 	return 0;
 }
