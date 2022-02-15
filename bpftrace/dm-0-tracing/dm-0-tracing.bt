@@ -1,0 +1,103 @@
+#!/usr/bin/env bpftrace
+
+/*
+*    command:
+*       ./dm-0-tracing.bt -c '/usr/local/bin/main -w /dev/dm-1'
+*
+*/
+
+//#include "vmlinux.h"
+
+#include <linux/fs.h>
+#include <linux/blk_types.h>
+#include <linux/genhd.h>
+
+BEGIN
+{
+	printf("Tracing IO for Zoned Block Device\n");
+
+	@proc = "main";
+}
+
+k:ksys_write
+/comm == @proc/
+{
+	$fd = arg0;
+	$buf = arg1;
+	$count = arg2;
+
+	printf("%s -- ", probe);
+
+	printf("fd:%d buf:%p $count:%d", $fd, $buf, $count);
+
+	printf("\n");
+}
+
+k:vfs_write
+/comm == @proc/
+{
+	printf("  %s -- ", probe);
+
+	printf("%s", ksym(((struct file *)arg0)->f_op->write_iter));
+
+	printf("\n");
+}
+
+k:submit_bio
+/comm == @proc/
+{
+	$bio = (struct bio *)arg0;
+	//$disk = $bio->bi_disk;
+
+	printf("    %s -- ", probe);
+
+	//printf("%s", ksym($disk->disk->fops->submit_bio));
+	//printf("%s", $disk->disk_name);
+	printf("bi_opf:%d", $bio->bi_opf);
+
+	printf("\n");
+}
+
+k:dmz_submit_bio
+/0/
+{
+	@[comm, kstack] = count();
+}
+
+k:dmz_map
+/comm == @proc && 0/
+{
+	@[comm, kstack] = count();
+}
+
+/******************************************************************/
+
+kr:submit_bio
+/comm == @proc/
+{
+	printf("    %s -- \n", probe);
+}
+
+kr:vfs_write
+/comm == @proc/
+{
+	printf("  %s -- ", probe);
+
+	printf("ret:%d", retval);
+
+	printf("\n");
+}
+
+kr:ksys_write
+/comm == @proc/
+{
+	printf("%s -- ", probe);
+
+	printf("ret:%d", retval);
+
+	printf("\n");
+}
+
+END
+{
+}
