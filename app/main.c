@@ -14,7 +14,7 @@
 			printf(fmt, ## __VA_ARGS__); \
 	} while(0)
 
-#define BUFSZ (4096 * 1)
+#define BUFSZ (4096)
 
 void usage()
 {
@@ -25,6 +25,7 @@ void usage()
 		"[  --read,  -r ] --- read data from the device\n"
 		"[  --pattern=<PTN>, -p <PTN> ]  --- data pattern\n"
 		"[  --offset=<OFT>, -o <OFT> ]  --- offset\n"
+		"[  --size=<SZ>, -s <SZ> ]  --- size in byte\n"
 		"[  --verbose, -v ] --- print more information\n"
 		"[  --help, -h ] --- show help\n"
 		"\nExamples:\n"
@@ -37,10 +38,11 @@ void usage()
 int main(int argc, char *argv[])
 {
 	char dev[32];
-	int wr, rd, v, offset;
+	int wr, rd, v;
 	int fd, ret;
 	unsigned char wrdata_pattern;
 	unsigned char *wrbuf, *rdbuf;
+	int offset, size;
 
 	char ch;
 	char *short_opts = "wrp:vh";
@@ -49,6 +51,7 @@ int main(int argc, char *argv[])
 		{"read", no_argument, NULL, 'r'},
 		{"pattern", required_argument, NULL, 'p'},
 		{"offset", required_argument, NULL, 'o'},
+		{"size", required_argument, NULL, 's'},
 		{"verbose", no_argument, NULL, 'v'},
 		{"help", no_argument, NULL, 'h'},
 		{NULL, 0, NULL, 0},
@@ -60,6 +63,7 @@ int main(int argc, char *argv[])
 
 	wrdata_pattern = 0;
 	offset = 0;
+	size = BUFSZ;
 
 	while ((ch = getopt_long_only(argc, argv, short_opts, long_opts, NULL)) != -1) {
 		switch (ch) {
@@ -74,6 +78,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'o':
 			offset = strtol(optarg, NULL, 10);
+			break;
+		case 's':
+			size = strtol(optarg, NULL, 10);
 			break;
 		case 'v':
 			v = 1;
@@ -93,7 +100,8 @@ int main(int argc, char *argv[])
 	}
 
 	IOT_PRINT("Start test.....\n");
-	IOT_PRINT("rd:%d wr:%d, oft:%d pattern:0x%x\n", rd, wr, offset, wrdata_pattern);
+	IOT_PRINT("rd:%d wr:%d, oft:%d size:%d pattern:0x%x\n",
+		rd, wr, offset, size, wrdata_pattern);
 
 	strcpy(dev, argv[optind]);
 	fd = open(dev, O_RDWR | O_CREAT | O_SYNC | O_DIRECT, S_IRWXU | S_IRWXG | S_IRWXO);
@@ -103,15 +111,15 @@ int main(int argc, char *argv[])
 	}
 
 	if (wr) {
-		ret = posix_memalign((void **)&wrbuf, BUFSZ, BUFSZ);
+		ret = posix_memalign((void **)&wrbuf, BUFSZ, size);
 		if (ret) {
 			printf("posix_memalign failed! %s\n", strerror(ret));
 			return -1;
 		}
-		memset(wrbuf, wrdata_pattern, BUFSZ);
+		memset(wrbuf, wrdata_pattern, size);
 		IOT_PRINT("wr:buf:%p pattern:0x%x\n", wrbuf, wrdata_pattern);
 
-		ret = write(fd, wrbuf, BUFSZ);
+		ret = write(fd, wrbuf, size);
 		if (ret == -1) {
 			perror("write failed.");
 			return ret;
@@ -123,20 +131,20 @@ int main(int argc, char *argv[])
 	lseek(fd, offset, SEEK_SET);
 
 	if (rd) {
-		ret = posix_memalign((void **)&rdbuf, BUFSZ, BUFSZ);
+		ret = posix_memalign((void **)&rdbuf, BUFSZ, size);
 		if (ret) {
 			printf("posix_memalign failed! %s\n", strerror(ret));
 			return -1;
 		}
-		memset(rdbuf, 0x0, BUFSZ);
+		memset(rdbuf, 0x0, size);
 
-		ret = read(fd, rdbuf, BUFSZ);
+		ret = read(fd, rdbuf, size);
 		if (ret == -1) {
 			perror("read failed.");
 			return ret;
 		}
 
-		IOT_PRINT("rd:buf:%p 0x%x--0x%x\n", rdbuf, rdbuf[0], rdbuf[BUFSZ-1]);
+		IOT_PRINT("rd:buf:%p 0x%x--0x%x\n", rdbuf, rdbuf[0], rdbuf[size-1]);
 
 		free(rdbuf);
 	}
