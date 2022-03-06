@@ -14,7 +14,7 @@
 			printf(fmt, ## __VA_ARGS__); \
 	} while(0)
 
-#define BUFSZ 4096
+#define BUFSZ (4096 * 1)
 
 void usage()
 {
