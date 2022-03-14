@@ -110,6 +110,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	lseek(fd, offset, SEEK_SET);
+
 	if (wr) {
 		ret = posix_memalign((void **)&wrbuf, BUFSZ, size);
 		if (ret) {
@@ -127,8 +129,6 @@ int main(int argc, char *argv[])
 
 		free(wrbuf);
 	}
-
-	lseek(fd, offset, SEEK_SET);
 
 	if (rd) {
 		ret = posix_memalign((void **)&rdbuf, BUFSZ, size);
