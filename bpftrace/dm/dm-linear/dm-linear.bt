@@ -1,0 +1,59 @@
+#!/usr/bin/env bpftrace
+
+/*
+*   test command:
+*        ./dm-linear.bt -c 'main -r /dev/mapper/joined'
+*/
+
+#include <linux/device-mapper.h>
+
+struct linear_c {
+	struct dm_dev *dev;
+	sector_t start;
+};
+
+BEGIN
+{
+	@proc = "main";
+}
+
+k:linear_map
+/comm == @proc/
+{
+	$ti = (struct dm_target *)arg0;
+	$bio = (struct bio *)arg1;
+	$table = (struct dm_table *)$ti->table;
+	$type = (struct target_type *)$ti->type;
+	$lc = (struct linear_c *)$ti->private;
+	$bdev = $lc->dev->bdev;
+	$bd_disk = $bdev->bd_disk;
+
+	printf("target:begin:%d len:%d\n", $ti->begin, $ti->len);
+	printf("type:name:%s", str($type->name));
+	printf("lc:dev:name:%s start:%d\n", $lc->dev->name, $lc->start);
+	printf("bd_disk:disk_name:%s major:%d minor:%d\n",
+			$bd_disk->disk_name,
+			$bd_disk->major,
+			$bd_disk->first_minor);
+	printf("bio:sector:%d\n", $bio->bi_iter.bi_sector);
+	//printf("mt:num_targets:%d\n", $table->depth);
+	//printf("stack:%s\n", kstack);
+}
+
+t:block:block_bio_remap
+/comm == @proc/
+{
+	$dev = args->dev;
+	$old_dev = args->old_dev;
+	$sector = args->sector;
+	$old_sector = args->old_sector;
+	$nr_sector = args->nr_sector;
+
+	printf("dev:0x%x old_dev:0x%x\n", $dev, $old_dev);
+	printf("sector:%d old_sector:%d\n", $sector, $old_sector);
+	printf("nr_sector:%d\n", $nr_sector);
+}
+
+END
+{
+}
