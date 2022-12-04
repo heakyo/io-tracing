@@ -8,10 +8,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <libaio.h>
+#include <assert.h>
 
 #define IOT_PRINT(fmt, ...)    \
 	do {                   \
-		if (v)         \
+		if (debug)         \
 			printf(fmt, ## __VA_ARGS__); \
 	} while(0)
 
@@ -27,11 +28,15 @@ void usage()
 		"[  --pattern=<PTN>, -p <PTN> ]  --- data pattern\n"
 		"[  --offset=<OFT>, -o <OFT> ]  --- offset\n"
 		"[  --size=<SZ>, -s <SZ> ]  --- size in byte\n"
-		"[  --verbose, -v ] --- print more information\n"
+		"[  --aio, -a ] --- use aio to read and write\n"
+		"[  --verified, -v ] --- verify read/write data\n"
+		"[  --debug, -d ] --- print more debug information\n"
 		"[  --help, -h ] --- show help\n"
 		"\nExamples:\n"
-		"\t1.write data to the device dm-0 with pattern 0xb5\n"
-		"\tmain -p a5 -w /dev/dm-0\n"
+		"1.write data to the device dm-0 with pattern 0xb5\n"
+		"\tmain -p b5 -w /dev/dm-0\n"
+		"2.write data to the file with pattern 0xa5 in aio mode\n"
+		"\tmain -p a5 -aw data\n"
 		);
 	_exit(-1);
 }
@@ -41,7 +46,7 @@ void usage()
 int main(int argc, char *argv[])
 {
 	char dev[32];
-	int wr, rd, v, aio;
+	int wr, rd, debug, aio, verify;
 	int fd, ret;
 	unsigned char wrdata_pattern;
 	unsigned char *wrbuf, *rdbuf;
@@ -54,7 +59,7 @@ int main(int argc, char *argv[])
 	unsigned nr_events = 1;
 
 	char ch;
-	char *short_opts = "wrp:o:s:avh";
+	char *short_opts = "wrp:o:s:avdh";
 	struct option long_opts[] = {
 		{"write", no_argument, NULL, 'w'},
 		{"read", no_argument, NULL, 'r'},
@@ -62,13 +67,14 @@ int main(int argc, char *argv[])
 		{"offset", required_argument, NULL, 'o'},
 		{"size", required_argument, NULL, 's'},
 		{"aio", no_argument, NULL, 'a'},
-		{"verbose", no_argument, NULL, 'v'},
+		{"verify", no_argument, NULL, 'v'},
+		{"debug", no_argument, NULL, 'd'},
 		{"help", no_argument, NULL, 'h'},
 		{NULL, 0, NULL, 0},
 	};
 
 	wr = rd = 0;
-	v = 0;
+	debug = 0;
 	opterr = 0;
 
 	wrdata_pattern = 0;
@@ -76,6 +82,8 @@ int main(int argc, char *argv[])
 	size = BUFSZ;
 
 	aio = 0;
+
+	ret = 0;
 
 	while ((ch = getopt_long_only(argc, argv, short_opts, long_opts, NULL)) != -1) {
 		switch (ch) {
@@ -98,7 +106,10 @@ int main(int argc, char *argv[])
 			aio = 1;
 			break;
 		case 'v':
-			v = 1;
+			verify = 1;
+			break;
+		case 'd':
+			debug = 1;
 			break;
 		case 'h':
 			usage();
@@ -118,126 +129,85 @@ int main(int argc, char *argv[])
 	IOT_PRINT("rd:%d wr:%d, oft:%d size:%d pattern:0x%x\n",
 		rd, wr, offset, size, wrdata_pattern);
 
-	strcpy(dev, argv[optind]);
-	fd = open(dev, O_RDWR | O_CREAT | O_SYNC | O_DIRECT, S_IRWXU | S_IRWXG | S_IRWXO);
-	if (fd == -1) {
-		perror("open failed.");
-		return -1;
-	}
-
 	if (aio) {
-		printf("Using AIO to do IO test\n");
+		IOT_PRINT("Using AIO to do IO test\n");
 
 		memset(&ctx, 0x0, sizeof(io_context_t));
 		ret = io_setup(nr_events, &ctx);
-		if (ret != 0) {
+		if (ret) {
 			perror("io setup failed.");
 			return ret;
 		}
 
-		for (i = 0; i < AIO_IOCNT; i++) {
+		for (i = 0; i < AIO_IOCNT; i++)
 			p[i] = &io[i];
-		}
 	}
 
-	lseek(fd, offset, SEEK_SET);
+	strcpy(dev, argv[optind]);
+	fd = open(dev, O_RDWR | O_CREAT | O_SYNC | O_DIRECT, S_IRWXU | S_IRWXG | S_IRWXO);
+	assert(fd != -1);
 
 	if (wr) {
 		ret = posix_memalign((void **)&wrbuf, BUFSZ, size);
-		if (ret) {
-			printf("posix_memalign failed! %s\n", strerror(ret));
-			return -1;
-		}
+		assert(!ret);
 		memset(wrbuf, wrdata_pattern, size);
+
 		IOT_PRINT("wr:buf:%p pattern:0x%x\n", wrbuf, wrdata_pattern);
 
 		if (aio) {
 			io_prep_pwrite(&io[0], fd, wrbuf, size, offset);
-
-			ret = io_submit(ctx, 1, p);
-			if (ret < 0) {
-				perror("io submit failed.");
-				io_destroy(ctx);
-				return ret;
-			}
-
-			while (1) {
-				ret = io_getevents(ctx, 1, 1, e, NULL);
-				if (ret < 0) {
-					perror("io  failed.");
-					io_destroy(ctx);
-					return ret;
-				}
-
-				if (ret == 1) {
-					printf("status: %ld, size: %ld\n", e[0].res2, e[0].res);
-					break;
-				}
-			}
-
 		} else {
-
-			ret = write(fd, wrbuf, size);
-			if (ret == -1) {
-				perror("write failed.");
-				return ret;
-			}
-
+			ret = pwrite(fd, wrbuf, size, offset);
+			assert(ret != -1);
 		}
-
-		free(wrbuf);
 	}
 
 	if (rd) {
 		ret = posix_memalign((void **)&rdbuf, BUFSZ, size);
-		if (ret) {
-			printf("posix_memalign failed! %s\n", strerror(ret));
-			return -1;
-		}
+		assert(!ret);
 		memset(rdbuf, 0x0, size);
 
 		if (aio) {
 			io_prep_pread(&io[0], fd, rdbuf, size, offset);
-
-			ret = io_submit(ctx, 1, p);
-			if (ret != 1) {
-				perror("io submit failed.");
-				io_destroy(ctx);
-				return ret;
-			}
-
-			while (1) {
-				ret = io_getevents(ctx, 1, AIO_IOCNT, e, NULL);
-				if (ret < 0) {
-					perror("io  failed.");
-					io_destroy(ctx);
-					return ret;
-				}
-
-				if (ret == 1) {
-					printf("status: %ld, size: %ld\n", e[0].res2, e[0].res);
-					break;
-				}
-			}
-
 		} else {
-			ret = read(fd, rdbuf, size);
-			if (ret == -1) {
-				perror("read failed.");
-				return ret;
+			ret = pread(fd, rdbuf, size, offset);
+			assert(ret != -1);
+		}
+	}
+
+	if (aio) {
+		ret = io_submit(ctx, 1, p);
+		assert(ret == 1);
+
+		while (1) {
+			ret = io_getevents(ctx, 1, AIO_IOCNT, e, NULL);
+			assert(ret >= 0);
+
+			if (ret == 1) {
+				printf("status: %ld, size: %ld\n", e[0].res2, e[0].res);
+				break;
 			}
 		}
+	}
 
+	if (verify) {
+		printf("Verify: TBD\n");
+	}
+
+	if (wr)
+		free(wrbuf);
+
+	if (rd) {
 		IOT_PRINT("rd:buf:%p 0x%x--0x%x\n", rdbuf, rdbuf[0], rdbuf[size-1]);
-
 		free(rdbuf);
 	}
 
-	io_destroy(ctx);
+	if (aio)
+		io_destroy(ctx);
 
 	close(fd);
 
 	IOT_PRINT("End test.....\n");
 
-	return 0;
+	return ret;
 }

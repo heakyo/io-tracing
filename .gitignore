@@ -1,6 +1,5 @@
 *.swp
 *.o
 *.i
-main
 *.dis
 *.swo
