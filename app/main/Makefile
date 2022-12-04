@@ -6,6 +6,9 @@ all: main
 install:
 	cp -a main /usr/local/bin
 
+uninstall:
+	rm /usr/local/bin/main
+
 main: main.o
 	$(CC) $(CFLAGS) -o $@ $< -laio
 
