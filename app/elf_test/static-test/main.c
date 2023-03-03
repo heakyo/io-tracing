@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
 {
 	int result = sub_func(subdata);
 
-        getchar();
+        //getchar();
 
         return 0;
 }
