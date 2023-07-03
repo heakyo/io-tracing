@@ -20,8 +20,10 @@ db_cmd_lockedvnods(void)
 	printf("%s\n", __func__);
 	TAILQ_FOREACH(mp, &mountlist, mnt_list) {
 		TAILQ_FOREACH(vp, &mp->mnt_nvnodelist, v_nmntvnodes) {
-			if (vp->v_type != VMARKER && VOP_ISLOCKED(vp))
+			if (vp->v_type != VMARKER && VOP_ISLOCKED(vp)) {
 				vn_printf(vp, "vnode ");
+				printf("lock status:%d\n", lockstatus(vp->v_vnlock));
+			}
 		}
 	}
 }
