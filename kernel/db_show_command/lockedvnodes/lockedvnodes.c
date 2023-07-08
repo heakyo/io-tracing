@@ -7,12 +7,13 @@
 #include <sys/vnode.h>
 #include <sys/mount.h>
 
+#include <sys/turnstile.h>
+
 static void
 db_cmd_lockedvnods(void)
 {
 	struct mount *mp;
 	struct vnode *vp;
-
 	unsigned int mnt_cnt;
 
 	mnt_cnt = 0;
@@ -22,7 +23,7 @@ db_cmd_lockedvnods(void)
 		TAILQ_FOREACH(vp, &mp->mnt_nvnodelist, v_nmntvnodes) {
 			if (vp->v_type != VMARKER && VOP_ISLOCKED(vp)) {
 				vn_printf(vp, "vnode ");
-				printf("lock status:%d\n", lockstatus(vp->v_vnlock));
+				printf("lock status:0x%x\n", lockstatus(vp->v_vnlock));
 			}
 		}
 	}
