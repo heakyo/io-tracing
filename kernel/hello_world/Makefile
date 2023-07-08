@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-.PATH: ${SRCTOP}/sys/hello_world
+.PATH: ${SRCTOP}/sys/mma/hello_world
 
 KMOD= hello
 SRCS= hello.c
