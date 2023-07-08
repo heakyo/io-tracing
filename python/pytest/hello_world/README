@@ -1,0 +1,23 @@
+##
+# /usr/local/bin/pip -> pip-3.8
+#
+#
+##
+
+0. Check the version of pip
+pip -V
+
+1. Install nose or pytest
+    pip install nose
+    pip install pytest
+
+2. Check the version of nose or pytest
+    pip show nose
+    pip show pytest
+
+3. Run the test using nose
+    nosetests
+
+4. Run the test using pytest
+    pytest
+
