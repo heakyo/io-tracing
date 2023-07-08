@@ -31,20 +31,46 @@ ffs_read:entry
 
 	this->fr_ap_vp = this->fr_ap->a_vp;
 
-	printf("vop_read_args:vp:%p uio:%p",\
+	printf("vop_read_args:vp:%p uio:%p",
 			this->fr_ap->a_vp,
 			this->fr_ap->a_uio
 			);
 
 	printf("\n\t\t\t\t\t      ");
-	printf("vnode:%p:tag:%s type:%d data:%p op:%p mount:%p",\
+	printf("vnode:%p:tag:%s type:%d data:%p op:%p mount:%p bufobj:%p",
 			this->fr_ap_vp,
 			stringof(this->fr_ap_vp->v_tag),
 			this->fr_ap_vp->v_type,
 			this->fr_ap_vp->v_data,
 			this->fr_ap_vp->v_op,
-			this->fr_ap_vp->v_mount
+			this->fr_ap_vp->v_mount,
+			&this->fr_ap_vp->v_bufobj
 			);
+
+	printf("\n\t\t\t\t\t      ");
+	printf("vnode:usecount:%d writecount:%d refcount:%d vnlock:%p v_lock:%p",
+			this->fr_ap_vp->v_usecount,
+			this->fr_ap_vp->v_writecount,
+			this->fr_ap_vp->v_holdcnt,
+			this->fr_ap_vp->v_vnlock,
+			&this->fr_ap_vp->v_lock
+			);
+
+	printf("\n\t\t\t\t\t      ");
+	this->fr_v_vnlock = this->fr_ap_vp->v_vnlock;
+	printf("lock:object:%p lock:(%p %p)",
+			&this->fr_v_vnlock->lock_object,
+			this->fr_v_vnlock->lk_lock,
+			curthread
+			);
+
+	printf("\n\t\t\t\t\t      ");
+	this->fr_lo = &this->fr_v_vnlock->lock_object;
+	printf("lock_object:name:%s flags:0x%x",
+			stringof(this->fr_lo->lo_name),
+			this->fr_lo->lo_flags
+			);
+
 
 	printf("\n\t\t\t\t\t      ");
 	this->fr_v_bufobj = this->fr_ap_vp->v_bufobj;
@@ -76,12 +102,13 @@ ffs_read:entry
 
 	printf("\n\t\t\t\t\t      ");
 	this->fr_inode = (struct inode *)this->fr_ap_vp->v_data;
-	printf("inode:%p:vnode:%p number:%d size:%d mode:0x%x din1:%p",\
+	printf("inode:%p:vnode:%p number:%d size:%d mode:0x%x diroff:%d, din1:%p",\
 			this->fr_inode,
 			this->fr_inode->i_vnode,
 			this->fr_inode->i_number,
 			this->fr_inode->i_size,
 			this->fr_inode->i_mode,
+			this->fr_inode->i_diroff,
 			this->fr_inode->dinode_u.din2
 			);
 
@@ -93,29 +120,83 @@ ffs_read:entry
 			this->fr_din2->di_db[0]
 			);
 
+	printf("\n\t\t\t\t\t      ");
+	this->fr_i_ump = this->fr_inode->i_ump;
+	printf("ufsmount:%p devvp(vtag:%s):%p bo:%p",\
+			this->fr_i_ump,
+			stringof(this->fr_i_ump->um_devvp->v_tag),
+			this->fr_i_ump->um_devvp,
+			this->fr_i_ump->um_bo
+			);
+
+	printf("\n\t\t\t\t\t      ");
+	this->fr_um_dev = this->fr_i_ump->um_dev;
+	printf("cdev:name:%s",\
+			this->fr_um_dev->si_name);
 
 	printf("\n\t\t\t\t\t      ");
 	this->fr_um_mountp = this->fr_inode->i_ump->um_mountp;
-	printf("mount:%p:vfc:%p op:%p",\
+	printf("mount:%p:vfc:%p op:%p vnodecovered:%p nvnodelistsize:%d data:%p",\
 			this->fr_um_mountp,
 			this->fr_um_mountp->mnt_vfc,
-			this->fr_um_mountp->mnt_op
+			this->fr_um_mountp->mnt_op,
+			this->fr_um_mountp->mnt_vnodecovered,
+			this->fr_um_mountp->mnt_nvnodelistsize,
+			this->fr_um_mountp->mnt_data
+			);
+
+	printf("\n\t\t\t\t\t      ");
+	this->fr_mnt_opt = this->fr_um_mountp->mnt_opt;
+	volist0 = this->fr_mnt_opt->tqh_first;
+	volist1 = volist0->link.tqe_next;
+	volist2 = volist1->link.tqe_next;
+	volist3 = volist2->link.tqe_next;
+	volist4 = volist3->link.tqe_next;
+	printf("vfsoptlist:[0]:(%s:%s) [1]:(%s:%s) [2]:(%s:%s) [3]:(%s:%s) [4]:%p:",\
+			stringof(volist0->name), stringof(volist0->value),
+			stringof(volist1->name), stringof(volist1->value),
+			stringof(volist2->name), stringof(volist2->value),
+			stringof(volist3->name), stringof(volist3->value),
+			volist4
+			);
+
+	printf("\n\t\t\t\t\t      ");
+	this->fr_mnt_vnodecovered = this->fr_um_mountp->mnt_vnodecovered;
+	printf("mnt_vnodecovered:tag:%s inumber:%d",
+			stringof(this->fr_mnt_vnodecovered->v_tag),
+			((struct inode *)(this->fr_mnt_vnodecovered->v_data))->i_number
 			);
 
 	printf("\n\t\t\t\t\t      ");
 	this->fr_mnt_nvnodelist = this->fr_um_mountp->mnt_nvnodelist;
-	printf("vnodelst:[0]:%p [1]:%p [2]:%p [3]:%p",\
-			this->fr_mnt_nvnodelist.tqh_first,
-			this->fr_mnt_nvnodelist.tqh_first->v_nmntvnodes.tqe_next,
-			this->fr_mnt_nvnodelist.tqh_first->v_nmntvnodes.tqe_next->v_nmntvnodes.tqe_next,
-			this->fr_mnt_nvnodelist.tqh_first->v_nmntvnodes.tqe_next->v_nmntvnodes.tqe_next->v_nmntvnodes.tqe_next
+	nvlist0 = this->fr_mnt_nvnodelist.tqh_first;
+	nvlist1 = nvlist0->v_nmntvnodes.tqe_next;
+	nvlist2 = nvlist1->v_nmntvnodes.tqe_next;
+	nvlist3 = nvlist2->v_nmntvnodes.tqe_next;
+	nvlist4 = nvlist3->v_nmntvnodes.tqe_next;
+	nvlist5 = nvlist4->v_nmntvnodes.tqe_next;
+	printf("vnodelst(%d):[0]:%p [1]:%p [2]:%p [3]:%p [4]:%p [5]:%p",\
+			this->fr_um_mountp->mnt_nvnodelistsize,
+			nvlist0,
+			nvlist1,
+			nvlist2,
+			nvlist3,
+			nvlist4,
+			nvlist5
 			);
+
 	printf("\n\t\t\t\t\t      ");
-	this->fr_vnodel = this->fr_mnt_nvnodelist.tqh_first->v_nmntvnodes.tqe_next->v_nmntvnodes.tqe_next->v_nmntvnodes.tqe_next;
-	printf("vnodelst:[4]:%p [5]:%p [6]:%p",\
-			this->fr_vnodel->v_nmntvnodes.tqe_next,
-			this->fr_vnodel->v_nmntvnodes.tqe_next->v_nmntvnodes.tqe_next,
-			this->fr_vnodel->v_nmntvnodes.tqe_next->v_nmntvnodes.tqe_next->v_nmntvnodes.tqe_next
+	this->fr_mnt_activevnodelist = this->fr_um_mountp->mnt_activevnodelist;
+	nvactlist0 = this->fr_mnt_activevnodelist.tqh_first;
+	nvactlist1 = nvactlist0->v_nmntvnodes.tqe_next;
+	nvactlist2 = nvactlist1->v_nmntvnodes.tqe_next;
+	nvactlist3 = nvactlist2->v_nmntvnodes.tqe_next;
+	printf("actvnodelst(%d):[0]:%p [1]:%p [2]:%p [3]:%p",\
+			this->fr_um_mountp->mnt_activevnodelistsize,
+			nvactlist0,
+			nvactlist1,
+			nvactlist2,
+			nvactlist3
 			);
 
 	printf("\n\t\t\t\t\t      ");
