@@ -25,6 +25,9 @@ physio:entry
 
 	printf("cdev:si_name:%s",\
 			this->physio_cdev->si_name);
+
+	printf("uio:iov[0].iov_base:0x%p",\
+			this->physio_uio->uio_iov[0].iov_base);
 }
 
 adastrategy:entry
