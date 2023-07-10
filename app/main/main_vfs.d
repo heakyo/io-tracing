@@ -3,7 +3,8 @@
 /*
  * test command:
  * 	./main_vfs.d -c './main -r /mnt/data15'
-*/
+ *      ./main_vfs.d -c './main -o 1024 -s 8192 -r /mnt/data15'
+ */
 
 #pragma D option flowindent
 
@@ -34,6 +35,38 @@ ffs_read:entry
 	printf("vop_read_args:vp:%p uio:%p",
 			this->fr_ap->a_vp,
 			this->fr_ap->a_uio
+			);
+
+	printf("\n\t\t\t\t\t      ");
+	this->fr_a_desc = this->fr_ap->a_gen.a_desc;
+	printf("vnodeop_desc:%p:name:%s call:%p",
+			this->fr_a_desc,
+			stringof(this->fr_a_desc->vdesc_name),
+			this->fr_a_desc->vdesc_call
+			);
+	printf("\n\t\t\t\t\t      ");
+	func((uintptr_t)this->fr_a_desc->vdesc_call);
+	printf("\n\t\t\t\t\t      ");
+	func((uintptr_t)this->fr_a_desc);
+
+	printf("\n\t\t\t\t\t      ");
+	this->fr_a_uio = this->fr_ap->a_uio;
+	printf("uio:iovcnt:%d offset:%d resid:%d segflg:%d rw:%d td:%p",
+			this->fr_a_uio->uio_iovcnt,
+			this->fr_a_uio->uio_offset,
+			this->fr_a_uio->uio_resid,
+			this->fr_a_uio->uio_segflg,
+			this->fr_a_uio->uio_rw,
+			this->fr_a_uio->uio_td
+			);
+
+	printf("\n\t\t\t\t\t      ");
+	this->fr_uio_iov = this->fr_a_uio->uio_iov;
+	self->fr_iov_base = this->fr_uio_iov->iov_base;
+	self->fr_iov_len = this->fr_uio_iov->iov_len;
+	printf("iovec:base:%p len:%d",
+			self->fr_iov_base,
+			self->fr_iov_len
 			);
 
 	printf("\n\t\t\t\t\t      ");
@@ -266,7 +299,7 @@ dastrategy:entry
 	this->as_bio_ma = this->as_bp->bio_ma;
 	this->as_object = this->as_bio_ma[0]->object;
 
-	printf("bio:cmd:%d offset:%d bcount:%d pblkno:%d data:0x%p flags:0x%x ma_n:%d resid:%d length:%d completed:%d ma_offset:0x%d from:0x%p to:0x%p", \
+	printf("bio:cmd:%d offset:%d bcount:%d pblkno:%d data:0x%p flags:0x%x ma_n:%d resid:%d length:%d completed:%d ma_offset:0x%d", \
 			this->as_bp->bio_cmd,
 			this->as_bp->bio_offset,
 			this->as_bp->bio_bcount,
@@ -277,13 +310,15 @@ dastrategy:entry
 			this->as_bp->bio_resid,
 			this->as_bp->bio_length,
 			this->as_bp->bio_completed,
-			this->as_bp->bio_ma_offset,
-			this->as_bp->bio_from,
-			this->as_bp->bio_to
+			this->as_bp->bio_ma_offset
 			);
 
 	printf("\n\t\t\t\t\t      ");
-	printf("bio:data[0]:0x%p", this->as_bp->bio_data);
+	printf("bio:data[0]:0x%p from:0x%p to:0x%p",
+			this->as_bp->bio_data,
+			this->as_bp->bio_from,
+			this->as_bp->bio_to
+			);
 
 	printf("\n\t\t\t\t\t      ");
 
@@ -334,7 +369,9 @@ if(0) {
 
 mprsas_action:entry
 /execname == proc/
-{}
+{
+	/*stack(50);*/
+}
 
 /*return*************************************************************************************/
 mprsas_action:return
@@ -355,7 +392,14 @@ g_vfs_strategy:return
 
 ffs_read:return
 /execname == proc/
-{}
+{
+	this->v = copyinstr((uintptr_t)self->fr_iov_base);
+	printf("iovec:base:%p len:%d",
+			self->fr_iov_base,
+			self->fr_iov_len
+			);
+	trace(this->v);
+}
 
 ufs_lookup_ino:return
 /execname == proc/
