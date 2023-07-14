@@ -1,0 +1,84 @@
+#!/usr/bin/env python
+
+"""
+isi_km_diag - Key manager diagnostics utility.
+"""
+from __future__ import print_function
+
+import sys
+from argparse import ArgumentParser
+from itertools import takewhile
+
+import isi.km.isi_km as isi_km
+import isi.km.isi_km_utils as kmutils
+import isi.misc
+
+def check_km_daemon():
+	"""Ensure KM daemon is alive and talking."""
+	km_daemon_alive = kmutils.get_pid()
+	#print(km_daemon_alive)
+	if not km_daemon_alive:
+		sys.exit("Key Manager Service is not running.")
+	else:
+		print("Key Manager - Service running - OK.")
+
+	km_rpc_alive = kmutils.verify_rpc_state()
+	#print(km_rpc_alive);
+	if not km_rpc_alive:
+		sys.exit("Key Manager - RPC communication state - Failed.")
+	else:
+		print("Key Manager - RPC communication state - OK.")
+
+def check_local_keystore():
+	"""Local keystore directory check"""
+	keystore_partition_state = kmutils.verify_mount_state()
+	#print(keystore_partition_state)
+	if not keystore_partition_state:
+		print("Key Manager - Local keystore partition not available.")
+	else:
+		print("Key Manager - Local keystore partition mounted - OK.")
+
+
+def dump_km_status(args):
+	"""Method to get keymanager status."""
+	print("Key Manager status:")
+
+	check_km_daemon()
+	check_local_keystore()
+
+	return True
+
+def get_opts():
+	"""CLI options parser."""
+	parser = ArgumentParser("isi_km_diag")
+	subparsers = parser.add_subparsers(title="Commands")
+
+	domain_help = "Key manager domain."
+	domain_choices = sorted([d.shortname for d in isi_km.km_domain_types])
+
+	# status command
+	status_help = "Current status of key manager subsystem."
+	status_parser = subparsers.add_parser("status", help=status_help)
+	status_parser.set_defaults(cmdfunc=dump_km_status)
+
+	#print([d.shortname for d in isi_km.km_domain_types])
+	#parser.print_help()
+
+	return parser
+
+def main():
+	"""isi_km_diag main()"""
+	parser = get_opts()
+	args = parser.parse_args()
+
+	result = args.cmdfunc(args)
+	if result is True:
+		return
+
+	#print(type(args))
+	print("Hello");
+
+	return 0
+
+if __name__ == "__main__":
+	sys.exit(main())
