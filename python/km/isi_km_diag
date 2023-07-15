@@ -38,6 +38,25 @@ def check_local_keystore():
 	else:
 		print("Key Manager - Local keystore partition mounted - OK.")
 
+def check_ifs_keystore():
+	"""/ifs keystore directory check"""
+	 # check if /ifs is mounted.
+	ifs_partition_mount_state = isi.misc.ifs_mounted()
+	if not ifs_partition_mount_state:
+		print("Key Manager - /ifs keystore partition not available.")
+	else:
+		print("Key Manager - /ifs keystore partition mounted - OK.")
+
+	# check if /ifs is ready.
+	ifs_partition_ready_state = isi.misc.ifs_ready()
+	if not ifs_partition_ready_state:
+		print("Key Manager - /ifs keystore partition not ready.")
+	else:
+		print("Key Manager - /ifs keystore partition I/O status - OK.")
+
+def make_kmclient(domain):
+	"""Create a new instance of KmSimple"""
+	return isi_km.KmSimple("km_diag", domain.value, False)
 
 def dump_km_status(args):
 	"""Method to get keymanager status."""
@@ -45,6 +64,25 @@ def dump_km_status(args):
 
 	check_km_daemon()
 	check_local_keystore()
+	check_ifs_keystore()
+
+	# Get version is agnostic of domain type, hence using NULL here.
+	with make_kmclient(isi_km.km_domain_types.ISI_KM_DOMAIN_NULL) as kmclient:
+		ret, ver_info = kmclient.getversion()
+		if ret:
+			return ret
+
+		print("Version = {0}.{1}".format(ver_info.major_version, ver_info.minor_version))
+
+		_isikm = isi_km.IsiKm()
+		for keystore_status in ver_info.keystores:
+			print(
+				"keystore domain [{0}] status = [{1}, [{2}]]".format(
+					isi_km.km_domain_types(keystore_status.domain).shortname,
+					keystore_status.status,
+					 _isikm.kmErrorToUserString(keystore_status.status),
+				)
+			)
 
 	return True
 
