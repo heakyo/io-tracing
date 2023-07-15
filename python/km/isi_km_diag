@@ -8,6 +8,7 @@ from __future__ import print_function
 import sys
 from argparse import ArgumentParser
 from itertools import takewhile
+from icecream import ic
 
 import isi.km.isi_km as isi_km
 import isi.km.isi_km_utils as kmutils
@@ -83,6 +84,17 @@ def dump_km_status(args):
 					 _isikm.kmErrorToUserString(keystore_status.status),
 				)
 			)
+	return True
+
+def enumerate_keyids(args):
+	"""Method to get keyId's from keystore for a given domain."""
+	domain = isi_km.km_domain_types.loads(args.domain)
+	ic(domain)
+
+	with make_kmclient(domain) as kmclient:
+		ret, key_id_list, msg = kmclient.enumerate_keyid(args.start, args.limit)
+		ic(ret, key_id_list, msg)
+		pass
 
 	return True
 
@@ -98,6 +110,28 @@ def get_opts():
 	status_help = "Current status of key manager subsystem."
 	status_parser = subparsers.add_parser("status", help=status_help)
 	status_parser.set_defaults(cmdfunc=dump_km_status)
+
+	# list command
+	list_help = "Key-Id's in keystore for specified domain."
+	list_parser = subparsers.add_parser("list", help=list_help)
+	list_parser.set_defaults(cmdfunc=enumerate_keyids)
+
+	list_parser.add_argument(
+		"--domain", choices=domain_choices, required=True, help=domain_help
+	)
+
+	startindex_help = (
+		"Index of key-identifier to start enumerating for the "
+		"specified domain. Optionally specified with list command."
+	)
+	list_parser.add_argument("--start", type=int, default=0, help=startindex_help)
+
+	limit_help = (
+		"Limit of key-identifiers to enumerate from specified "
+		"start_index for the specified domain. Optionally specified with "
+		"list command."
+	)
+	list_parser.add_argument("--limit", type=int, default=0, help=limit_help)
 
 	#print([d.shortname for d in isi_km.km_domain_types])
 	#parser.print_help()
