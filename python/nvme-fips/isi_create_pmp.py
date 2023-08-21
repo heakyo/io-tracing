@@ -5,6 +5,8 @@ import sys
 import isi.sys.disk as disk
 import isi.sys.geom as geom
 
+import mydisk
+
 mesh = geom.Mesh()
 
 def main():
@@ -16,7 +18,7 @@ def main():
 	partition_g = d_provider.partition_geom
 	print(partition_g)
 
-	if partition_g is None or len(partition_g.providers) > 0:
+	if 1 and (partition_g is None or len(partition_g.providers)) > 0:
 
 		print(partition_g.providers)
 
@@ -25,7 +27,8 @@ def main():
 		partition_g = d_provider.partition_geom
 
 	size = 20 * (1024 ** 3)
-	disk.make_partition(partition_g, "isilon-pmp", geom.GPT_ENT_TYPE_ISILON_PMP, size)
+	#disk.make_partition(partition_g, "isilon-pmp", geom.GPT_ENT_TYPE_ISILON_PMP, size)
+	mydisk.make_partition(partition_g, "isilon-pmp", geom.GPT_ENT_TYPE_ISILON_PMP, size)
 
 if __name__ == "__main__":
 	sys.exit(main())
