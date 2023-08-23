@@ -9,6 +9,7 @@ import sys
 import isi.app.lib.procs as procs
 import isi.hw.bay as bay
 import isi.sys.disk as disk
+import mydisk
 
 from icecream import ic
 
@@ -45,7 +46,7 @@ class IsiPrepDisk(object):
 				dev = dev.strip()
 				if not dev.startswith("/dev"):
 					dev = "/dev/" + dev
-			# ic(dev)
+			#ic(dev)
 
 			if not dev or not os.path.exists(dev):
 				self.logger.error(
@@ -87,7 +88,8 @@ class IsiPrepDisk(object):
 						self.logger.error("Error from wipe_disk: %s", err)
 						sys.exit(1)
 
-				ret = disk.prep_disk(drive)
+				#ret = disk.prep_disk(drive)
+				ret = mydisk.prep_disk(drive)
 
 			if len(self.drives) == 1:
 				sys.exit(ret)
