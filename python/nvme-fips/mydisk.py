@@ -113,6 +113,7 @@ def pre_newfs_disk_provider(dp, force=False):
 
 		scratch_start, scratch_size = disk.scratch_aligned_start_size(partition_geom)
 		ic(scratch_start, scratch_size)
+		ic(dp.name, dp.sectorsize)
 
 		if supportsSEDs:
 			band1_start = scratch_start
@@ -120,6 +121,9 @@ def pre_newfs_disk_provider(dp, force=False):
 
 			band1_size = band2_start - band1_start
 			band2_size = ifs_size
+
+			ic(band1_start, band1_size)
+			ic(band2_start, band2_size)
 
 			ret = sed.take_ownership(
 				dp.name, band1_start, band1_size, band2_start, band2_size
