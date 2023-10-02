@@ -3,3 +3,7 @@
 *.i
 *.dis
 *.swo
+*.gcda
+*.gcno
+*.gdb_history
+*.log
