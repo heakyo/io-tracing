@@ -19,10 +19,17 @@ conn = sqlite3.connect('/keystore/sedsprovider.db')
 cursor = conn.cursor()
 #cursor.execute("SELECT count(*) FROM key_record_info")
 #cursor.execute("SELECT key_identifier FROM key_record_info ORDER BY key_identifier")
+#cursor.execute("SELECT key_identifier, \
+#			domaintype, \
+#			key_length, \
+#			key_content \
+#			FROM key_record_info ORDER BY key_identifier")
+
 cursor.execute("SELECT key_identifier, \
 			domaintype, \
-			key_length, \
-			key_content \
+			key_content, \
+			encrypting_key_id, \
+			encryption_iv \
 			FROM key_record_info ORDER BY key_identifier")
 
 rows = cursor.fetchall()
