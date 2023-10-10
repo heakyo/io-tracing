@@ -22,4 +22,5 @@ BEGIN
 END
 {
 	printf("-----IO Tracing END-----");
+	printf("\n\t\t\t\t\t      ");
 }
