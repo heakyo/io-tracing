@@ -3,7 +3,9 @@
 /*
  * test command:
  * 	./hello-dtrace.d
-*/
+ */
+
+#pragma D option flowindent
 
 BEGIN
 {
