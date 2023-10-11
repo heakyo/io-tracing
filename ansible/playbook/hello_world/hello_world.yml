@@ -1,0 +1,22 @@
+---
+- name: Print Hello World on Three Nodes
+  hosts: all
+  tasks:
+    - name: Hello World
+      debug:
+
+- name: Print Peter and May on Three Nodes
+  hosts: all
+  tasks:
+    - name: Peter and May
+      debug:
+        msg:
+          - "Peter"
+          - "May"
+
+- name: Print Byebye World on Three Nodes
+  hosts: all
+  tasks:
+    - name: Byebye World
+      debug:
+        msg: "Byebye World"
