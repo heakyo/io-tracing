@@ -1,0 +1,8 @@
+[myservers]
+10.227.237.21
+10.227.237.22
+10.227.237.23
+
+[myservers:vars]
+ansible_user=root
+ansible_password=a
