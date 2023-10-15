@@ -13,3 +13,13 @@ ansible_password=a
 
 # playbook hello world
 ansible-playbook playbook/hello_world/hello_world.yml
+
+# Print the variable set by the module set_fact in the ymal file
+# 1. use the ansible command
+ansible localhost -m include_tasks -a 'file=roles/hello_world/tasks/main.yml'
+
+# 2. use the ansible playbook
+ansible-playbook debug_playbook.yml
+
+# 3. use the ad-hoc command
+ansible localhost -m include_vars -a 'file=vars.yml'

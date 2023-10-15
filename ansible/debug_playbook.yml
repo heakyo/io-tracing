@@ -1,0 +1,18 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Include file main.yml
+      include_tasks:
+        file: roles/hello_world/tasks/main.yml
+
+    - name: Debugging -- Print the variable var_hw
+      debug:
+        var: var_hw
+
+    - name: Debugging -- Print the variable var_hw2
+      debug:
+        var: var_hw2
+
