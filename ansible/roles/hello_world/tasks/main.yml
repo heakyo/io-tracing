@@ -1,0 +1,9 @@
+---
+- name: Set var
+  set_fact:
+    var_hw: "Hello World"
+
+# tasks file for hello_world
+- name: Hello World
+  debug:
+    msg: "{{var_hw}}"

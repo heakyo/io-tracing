@@ -1,1 +1,15 @@
+# Ansible hosts
+# Edit the hosts
+masternode1:~/repo/io-tracing/ansible # cat inventory/hosts
+[myservers]
+server ip1 -- (e.g. 10.227.237.21)
+server ip2 -- (e.g. 10.227.237.22)
+server ip3 -- (e.g. 10.227.237.23)
+
+[myservers:vars]
+ansible_user=root
+ansible_password=a
+
+
+# playbook hello world
 ansible-playbook playbook/hello_world/hello_world.yml
