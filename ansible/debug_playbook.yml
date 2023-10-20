@@ -10,7 +10,7 @@
         var: s1
 
     - block:
-      - name: Include file main.yml
+      - name: Block 1 --- Include file main.yml
         include_tasks:
           file: roles/hello_world/tasks/main.yml
 
@@ -27,21 +27,29 @@
           var: var_hw2
 
     - block:
-      - name: Command Uptime
+      - name: Block 2 --- Command Uptime
         shell: /usr/bin/uptime
         register: result
 
-      - name: Command Result Uptime
-        debug:
+      - debug:
           msg:
             - "{{ result.changed }}"
             - "{{ result.stdout }}"
 
     - block:
-        - name: With Items Test
+        - name: Block 3 --- With Items Test
           debug:
             msg: "An item: {{ item }}"
           with_items:
             - 1
             - 2
             - 3
+
+    - block:
+        - name: Block 4 --- Obtain the stats of file
+          stat:
+            path: ./vars.yml
+          register: st
+
+        - debug:
+            msg: "{{ st }}"
