@@ -10,9 +10,15 @@
 
     - name: Debugging -- Print the variable var_hw
       debug:
-        var: var_hw
+        msg:
+          - "{{var_hw}}"
 
     - name: Debugging -- Print the variable var_hw2
       debug:
         var: var_hw2
 
+    - shell: /usr/bin/uptime
+      register: result
+
+    - debug:
+        var: result
