@@ -1,2 +1,4 @@
 ---
 var_hw2: "Hello, World!"
+listjojo: "jojo is a"
+listjojocomma: "{{ 'jojo,is,b' | split(',') }}"

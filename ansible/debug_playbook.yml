@@ -3,16 +3,24 @@
   gather_facts: no
   vars_files:
     - vars.yml
+  vars:
+    s1: "Abc,Efg"
   tasks:
+    - debug:
+        var: s1
+
     - block:
       - name: Include file main.yml
         include_tasks:
           file: roles/hello_world/tasks/main.yml
 
-      - name: Debugging -- Print the variable var_hw
+      - name: Debugging -- Print the variable in vars,yml
         debug:
           msg:
-            - "{{var_hw}}"
+            - "var_hw: {{ var_hw }}"
+            - "listjojo: {{ listjojo.split() }}"
+            - "listjojo: {{ listjojo | split() }}"
+            - "listjojocomma: {{ listjojocomma }}"
 
       - name: Debugging -- Print the variable var_hw2
         debug:
@@ -28,3 +36,12 @@
           msg:
             - "{{ result.changed }}"
             - "{{ result.stdout }}"
+
+    - block:
+        - name: With Items Test
+          debug:
+            msg: "An item: {{ item }}"
+          with_items:
+            - 1
+            - 2
+            - 3
