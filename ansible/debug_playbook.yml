@@ -4,21 +4,27 @@
   vars_files:
     - vars.yml
   tasks:
-    - name: Include file main.yml
-      include_tasks:
-        file: roles/hello_world/tasks/main.yml
+    - block:
+      - name: Include file main.yml
+        include_tasks:
+          file: roles/hello_world/tasks/main.yml
 
-    - name: Debugging -- Print the variable var_hw
-      debug:
-        msg:
-          - "{{var_hw}}"
+      - name: Debugging -- Print the variable var_hw
+        debug:
+          msg:
+            - "{{var_hw}}"
 
-    - name: Debugging -- Print the variable var_hw2
-      debug:
-        var: var_hw2
+      - name: Debugging -- Print the variable var_hw2
+        debug:
+          var: var_hw2
 
-    - shell: /usr/bin/uptime
-      register: result
+    - block:
+      - name: Command Uptime
+        shell: /usr/bin/uptime
+        register: result
 
-    - debug:
-        var: result
+      - name: Command Result Uptime
+        debug:
+          msg:
+            - "{{ result.changed }}"
+            - "{{ result.stdout }}"
