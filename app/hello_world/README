@@ -1,0 +1,12 @@
+/libexec/ld-elf.so.1
+hdr:entry:8000 type:3 phoff:64 phnum:8 phentsize:56
+
+0x80020a000 = 0x800202000 + 0x8000
+
+info prog m
+          Start Addr           End Addr       Size     Offset   Flags   File
+         0x800202000        0x80020a000     0x8000        0x0  r-- CN-- /libexec/ld-elf.so.1
+         0x80020a000        0x80022d000    0x23000     0x8000  r-x C--- /libexec/ld-elf.so.1
+         0x80022d000        0x80022e000     0x1000    0x2b000  rw- CN-- /libexec/ld-elf.so.1
+         0x80022e000        0x800230000     0x2000        0x0  rw- ----
+
