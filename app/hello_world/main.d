@@ -68,6 +68,27 @@ do_execve:entry
 	printf("\n\t\t\t\t\t      ");
 }
 
+exec_map_first_page:entry
+/execname == parent/
+{
+	this->emfp_imgp = args[0];
+
+	printf("args:imgp:%p", this->emfp_imgp);
+
+	printf("\n\t\t\t\t\t      ");
+	printf("imgp:image_header:%p execpath:%p",
+		this->emfp_imgp->image_header,
+		this->emfp_imgp->execpath
+		);
+
+	printf("\n\t\t\t\t\t      ");
+	this->emfp_proc = this->emfp_imgp->proc;
+	printf("proc:%p comm:%s",
+		this->emfp_proc,
+		this->emfp_proc->p_comm
+		);
+}
+
 /*
  * file: sys\kern\imgact_elf.c
  * function: __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
@@ -186,6 +207,34 @@ exec_elf64_imgact:return
 	this->eei_ret_proc = this->eei_imgp->proc;
 	printf("proc:comm:%s",
 		this->eei_ret_proc->p_comm
+		);
+}
+
+exec_map_first_page:return
+/execname == parent/
+{
+	printf("Return------------------------------------------------");
+	printf("\n\t\t\t\t\t      ");
+
+	printf("args:imgp:%p", this->emfp_imgp);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("imgp:image_header:%p execpath:%p",
+		this->emfp_imgp->image_header,
+		this->emfp_imgp->execpath
+		);
+
+	printf("\n\t\t\t\t\t      ");
+	this->emfp_hdr = (const Elf64_Ehdr *)this->emfp_imgp->image_header;
+	printf("hdr:ident:%s",stringof(this->emfp_hdr->e_ident));
+
+	printf("\n\t\t\t\t\t      ");
+	printf("hdr:entry:%p type:%d phoff:%d phnum:%d phentsize:%d",
+		this->emfp_hdr->e_entry,
+		this->emfp_hdr->e_type,
+		this->emfp_hdr->e_phoff,
+		this->emfp_hdr->e_phnum,
+		this->emfp_hdr->e_phentsize
 		);
 }
 
