@@ -83,9 +83,65 @@ exec_map_first_page:entry
 
 	printf("\n\t\t\t\t\t      ");
 	this->emfp_proc = this->emfp_imgp->proc;
-	printf("proc:%p comm:%s",
+	printf("|--proc:%p comm:%s",
 		this->emfp_proc,
 		this->emfp_proc->p_comm
+		);
+
+	printf("\n\t\t\t\t\t      ");
+	this->emfp_vp =  this->emfp_imgp->vp;
+	printf("|--vp:%p tag:%s type:%d data:%p op:%p",
+		this->emfp_vp,
+		stringof(this->emfp_vp->v_tag),
+		this->emfp_vp->v_type,
+		this->emfp_vp->v_data,
+		this->emfp_vp->v_op
+		);
+	func((uintptr_t)this->emfp_vp->v_op);
+
+	printf("\n\t\t\t\t\t      ");
+	this->emfp_object =  this->emfp_vp->v_bufobj.bo_object;
+	printf("|  |--v_object:%p size:%d resident_page_count:%d",
+		this->emfp_object,
+		this->emfp_object->size,
+		this->emfp_object->resident_page_count
+		);
+	func((uintptr_t)this->emfp_object->handle);
+
+	printf("\n\t\t\t\t\t      ");
+	this->emfp_memq = this->emfp_object->memq;
+	this->emfp_vmpg = this->emfp_memq.tqh_first;
+	printf("|  |  |--pglist(vm_page): pindex:%d, phys_addr:0x%lx flags:0x%x order:%d isi_fstate:%d",
+		this->emfp_vmpg->pindex,
+		this->emfp_vmpg->phys_addr,
+		this->emfp_vmpg->flags,
+		this->emfp_vmpg->order,
+		this->emfp_vmpg->isi_fstate);
+
+			/*********************************pv list begin*********************************/
+			this->emfp_md = this->emfp_vmpg->md;
+			this->emfp_pv_list = this->emfp_md.pv_list;
+
+			/*printf("\n\t\t\t\t\t      ");*/
+			this->emfp_pv_entry = this->emfp_pv_list.tqh_first;
+			/*printf("|  |  |  |  |--pv_list(pv_entry): pv_va:0x%p", this->emfp_pv_entry->pv_va);*/
+			/*printf("pv_entry:%p", this->emfp_pv_entry);*/
+			/*********************************pv list end*********************************/
+
+	printf("\n\t\t\t\t\t      ");
+	this->emfp_vmpg = this->emfp_vmpg->listq.tqe_next;
+	printf("|  |  |--pglist(vm_page): pindex:%d, phys_addr:0x%lx flags:0x%x order:%d isi_fstate:%d",
+		this->emfp_vmpg->pindex,
+		this->emfp_vmpg->phys_addr,
+		this->emfp_vmpg->flags,
+		this->emfp_vmpg->order,
+		this->emfp_vmpg->isi_fstate);
+
+	printf("\n\t\t\t\t\t      ");
+	this->emfp_inode = (struct inode *)this->emfp_vp->v_data;
+	printf("inode:number:%d size:%d",
+		this->emfp_inode->i_number,
+		this->emfp_inode->i_size
 		);
 }
 
