@@ -15,6 +15,7 @@ BEGIN
 	parent = "zsh";
 
 	key_emfp = 0;
+	key_de = 0;
 }
 /*common*************************************************************************************/
 post_execve:entry,
@@ -40,6 +41,12 @@ vm_radix_lookup_unlocked:return
 vm_page_grab_valid:entry,
 vm_page_grab_valid:return
 /execname == parent && key_emfp/
+{}
+
+/* get vnode of main in this function */
+lookup:entry,
+lookup:return
+/execname == parent && key_de/
 {}
 
 /*entry**************************************************************************************/
@@ -88,11 +95,29 @@ do_execve:entry
 		);
 
 	printf("\n\t\t\t\t\t      ");
+
+	key_de = 1;
 }
 
 namei:entry
-/execname == parent/
-{}
+/execname == parent && key_de/
+{
+	this->n_ndp = args[0];
+
+	printf("args:ndp:%p", this->n_ndp);
+
+	printf("\n\t\t\t\t\t      ");
+	printf("ndp:dirp:%s vp:%p segflg:%p",
+		stringof(this->n_ndp->ni_dirp),
+		this->n_ndp->ni_vp,
+		this->n_ndp->ni_segflg
+		);
+
+	printf("\n\t\t\t\t\t      ");
+	this->n_ni_cnd = this->n_ndp->ni_cnd;
+	printf("|--ni_cnd:pnbuf:%s",
+		stringof(this->n_ni_cnd.cn_pnbuf));
+}
 
 exec_map_first_page:entry
 /execname == parent/
@@ -378,12 +403,22 @@ exec_map_first_page:return
 }
 
 namei:return
-/execname == parent/
-{}
+/execname == parent && key_de/
+{
+	printf("Return------------------------------------------------");
+	printf("\n\t\t\t\t\t      ");
+	printf("ndp:dirp:%s vp:%p",
+		stringof(this->n_ndp->ni_dirp),
+		this->n_ndp->ni_vp
+		);
+}
 
 do_execve:return
 /execname == parent/
 {
+	key_de = 0;
+
+	printf(" ");
 }
 
 kern_execve:return
