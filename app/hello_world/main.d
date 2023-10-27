@@ -76,10 +76,17 @@ exec_map_first_page:entry
 	printf("args:imgp:%p", this->emfp_imgp);
 
 	printf("\n\t\t\t\t\t      ");
-	printf("imgp:image_header:%p execpath:%p",
-		this->emfp_imgp->image_header,
+	printf("imgp: execpath:%p",
 		this->emfp_imgp->execpath
 		);
+
+	printf("\n\t\t\t\t\t      ");
+	printf("|--image_header:%p", this->emfp_imgp->image_header);
+
+	printf("\n\t\t\t\t\t      ");
+	this->emfp_firstpage = this->emfp_imgp->firstpage;
+	printf("|--firstpage:%p", this->emfp_firstpage);
+
 
 	printf("\n\t\t\t\t\t      ");
 	this->emfp_proc = this->emfp_imgp->proc;
@@ -90,11 +97,12 @@ exec_map_first_page:entry
 
 	printf("\n\t\t\t\t\t      ");
 	this->emfp_vp =  this->emfp_imgp->vp;
-	printf("|--vp:%p tag:%s type:%d data:%p op:%p",
+	printf("|--vp:%p tag:%s type:%d data:%p object:%p op:%p",
 		this->emfp_vp,
 		stringof(this->emfp_vp->v_tag),
 		this->emfp_vp->v_type,
 		this->emfp_vp->v_data,
+		this->emfp_vp->v_bufobj.bo_object,
 		this->emfp_vp->v_op
 		);
 	func((uintptr_t)this->emfp_vp->v_op);
@@ -111,22 +119,27 @@ exec_map_first_page:entry
 	printf("\n\t\t\t\t\t      ");
 	this->emfp_memq = this->emfp_object->memq;
 	this->emfp_vmpg = this->emfp_memq.tqh_first;
-	printf("|  |  |--pglist(vm_page): pindex:%d, phys_addr:0x%lx flags:0x%x order:%d isi_fstate:%d",
+	printf("|  |  |--pglist(vm_page:%p): pindex:%d, phys_addr:0x%lx flags:0x%x order:%d isi_fstate:%d object:%p",
+		this->emfp_vmpg,
 		this->emfp_vmpg->pindex,
 		this->emfp_vmpg->phys_addr,
 		this->emfp_vmpg->flags,
 		this->emfp_vmpg->order,
-		this->emfp_vmpg->isi_fstate);
+		this->emfp_vmpg->isi_fstate,
+		this->emfp_vmpg->object
+		);
 
 			/*********************************pv list begin*********************************/
 			this->emfp_md = this->emfp_vmpg->md;
 			this->emfp_pv_list = this->emfp_md.pv_list;
 
 			/*printf("\n\t\t\t\t\t      ");*/
-			this->emfp_pv_entry = this->emfp_pv_list.tqh_first;
+			/*this->emfp_pv_entry = this->emfp_pv_list.tqh_first;*/
 			/*printf("|  |  |  |  |--pv_list(pv_entry): pv_va:0x%p", this->emfp_pv_entry->pv_va);*/
 			/*printf("pv_entry:%p", this->emfp_pv_entry);*/
 			/*********************************pv list end*********************************/
+			/*printf("pv_entry:%p", this->emfp_vp->v_bufobj.bo_object->memq.tqh_first->md.pv_list.tqh_first);*/
+			/*printf("pv_va:%p", this->emfp_vp->v_bufobj.bo_object->memq.tqh_first->md.pv_list.tqh_first->pv_va);*/
 
 	printf("\n\t\t\t\t\t      ");
 	this->emfp_vmpg = this->emfp_vmpg->listq.tqe_next;
@@ -144,6 +157,15 @@ exec_map_first_page:entry
 		this->emfp_inode->i_size
 		);
 }
+
+vm_page_grab_valid_unlocked:entry
+/execname == parent/
+{
+	this->sba_m = args[0];
+
+	printf("args:m:%p", this->sba_m);
+}
+
 
 /*
  * file: sys\kern\imgact_elf.c
@@ -248,10 +270,11 @@ exec_elf64_imgact:return
 	printf("args:imgp:%p", this->eei_imgp);
 
 	printf("\n\t\t\t\t\t      ");
-	printf("imgp:entry_addr:%p interpreter_name:%p sysent:%p",
-		this->eei_imgp->entry_addr,
+	printf("imgp:entry_addr:%p int/erpreter_name:%p sysent:%p firstpage:%p",
+		this->eei_imgp->entry/_addr,
 		this->eei_imgp->interpreter_name,
-		this->eei_imgp->sysent
+		this->eei_imgp->sysent,
+		this->eei_imgp->firstpage
 		);
 
 	printf("\n\t\t\t\t\t      ");
@@ -266,6 +289,10 @@ exec_elf64_imgact:return
 		);
 }
 
+vm_page_grab_valid_unlocked:return
+/execname == parent/
+{}
+
 exec_map_first_page:return
 /execname == parent/
 {
@@ -275,9 +302,25 @@ exec_map_first_page:return
 	printf("args:imgp:%p", this->emfp_imgp);
 	printf("\n\t\t\t\t\t      ");
 
-	printf("imgp:image_header:%p execpath:%p",
-		this->emfp_imgp->image_header,
+	printf("imgp: execpath:%p",
 		this->emfp_imgp->execpath
+		);
+
+	printf("\n\t\t\t\t\t      ");
+	printf("|--image_header:%p", this->emfp_imgp->image_header);
+
+	printf("\n\t\t\t\t\t      ");
+	this->emfp_firstpage = this->emfp_imgp->firstpage;
+	printf("|--firstpage:%p", this->emfp_firstpage);
+
+	printf("\n\t\t\t\t\t      ");
+	printf("|  |--sf_buf:m:%p",
+		this->emfp_firstpage); /*sf_buf.h: struct sf_buf;*/
+
+	printf("\n\t\t\t\t\t      ");
+	printf("|  |--phys_addr:%p object:%p",
+		((struct vm_page *)this->emfp_firstpage)->phys_addr,
+		((struct vm_page *)this->emfp_firstpage)->object
 		);
 
 	printf("\n\t\t\t\t\t      ");
