@@ -13,11 +13,33 @@ BEGIN
 	printf("-----IO Tracing Start-----");
 
 	parent = "zsh";
+
+	key_emfp = 0;
 }
 /*common*************************************************************************************/
 post_execve:entry,
 post_execve:return
 /execname == parent/
+{}
+
+vm_radix_lookup_unlocked:entry
+/execname == parent && key_emfp/
+{}
+
+vm_radix_lookup_unlocked:return
+/execname == parent && key_emfp/
+{
+	this->ret_m = args[1];
+
+	printf("Return------------------------------------------------");
+	printf("\n\t\t\t\t\t      ");
+	printf("m:%p", this->ret_m);
+}
+
+
+vm_page_grab_valid:entry,
+vm_page_grab_valid:return
+/execname == parent && key_emfp/
 {}
 
 /*entry**************************************************************************************/
@@ -67,6 +89,10 @@ do_execve:entry
 
 	printf("\n\t\t\t\t\t      ");
 }
+
+namei:entry
+/execname == parent/
+{}
 
 exec_map_first_page:entry
 /execname == parent/
@@ -156,15 +182,21 @@ exec_map_first_page:entry
 		this->emfp_inode->i_number,
 		this->emfp_inode->i_size
 		);
+
+	key_emfp = 1;
 }
 
 vm_page_grab_valid_unlocked:entry
-/execname == parent/
+/execname == parent && key_emfp/
 {
 	this->sba_m = args[0];
 
 	printf("args:m:%p", this->sba_m);
 }
+
+vm_page_acquire_unlocked:entry
+/execname == parent && key_emfp/
+{}
 
 
 /*
@@ -271,7 +303,7 @@ exec_elf64_imgact:return
 
 	printf("\n\t\t\t\t\t      ");
 	printf("imgp:entry_addr:%p int/erpreter_name:%p sysent:%p firstpage:%p",
-		this->eei_imgp->entry/_addr,
+		this->eei_imgp->entry_addr,
 		this->eei_imgp->interpreter_name,
 		this->eei_imgp->sysent,
 		this->eei_imgp->firstpage
@@ -287,10 +319,16 @@ exec_elf64_imgact:return
 	printf("proc:comm:%s",
 		this->eei_ret_proc->p_comm
 		);
+
+}
+
+vm_page_acquire_unlocked:return
+/execname == parent && key_emfp/
+{
 }
 
 vm_page_grab_valid_unlocked:return
-/execname == parent/
+/execname == parent && key_emfp/
 {}
 
 exec_map_first_page:return
@@ -335,7 +373,13 @@ exec_map_first_page:return
 		this->emfp_hdr->e_phnum,
 		this->emfp_hdr->e_phentsize
 		);
+
+	key_emfp = 0;
 }
+
+namei:return
+/execname == parent/
+{}
 
 do_execve:return
 /execname == parent/
