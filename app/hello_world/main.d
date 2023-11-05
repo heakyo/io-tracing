@@ -69,7 +69,7 @@ sys_execve:entry
 }
 
 exec_copyin_args:entry
-/execname == parent/
+/execname == parent && 0/
 {
 }
 
@@ -85,6 +85,11 @@ do_execve:entry
 	this->de_args = args[1];
 	this->de_mac_p = args[2];
 
+	printf("args:mac_p:%p",
+		this->de_mac_p
+		);
+
+	printf("\n\t\t\t\t\t      ");
 	printf("args:buf:%s begin_argv:%s fname:%s argc:%d fd:%d fdp:%p",
 		stringof(this->de_args->buf),
 		stringof(this->de_args->begin_argv),
@@ -96,7 +101,7 @@ do_execve:entry
 
 	printf("\n\t\t\t\t\t      ");
 
-	key_de = 1;
+	key_de = 0;
 }
 
 namei:entry
@@ -427,7 +432,7 @@ kern_execve:return
 }
 
 exec_copyin_args:return
-/execname == parent/
+/execname == parent && 0/
 {
 }
 
