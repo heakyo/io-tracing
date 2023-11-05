@@ -46,7 +46,7 @@ vm_page_grab_valid:return
 /* get vnode of main in this function */
 lookup:entry,
 lookup:return
-/execname == parent && key_de/
+/execname == parent && key_de && 0/
 {}
 
 /*entry**************************************************************************************/
