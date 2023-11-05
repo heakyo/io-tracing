@@ -1,0 +1,6 @@
+# Run hello world
+go run hello_world.go
+
+# Compile/clean hello world packages
+go build hello_world.go
+go clean hello_world.go
