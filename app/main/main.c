@@ -7,7 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <libaio.h>
+//#include <libaio.h>
 #include <assert.h>
 
 #define IOT_PRINT(fmt, ...)    \
@@ -53,10 +53,12 @@ int main(int argc, char *argv[])
 	int offset, size;
 	int i;
 
+#if 0
 	io_context_t ctx;
 	struct iocb io[AIO_IOCNT], *p[AIO_IOCNT];
 	struct io_event e[1];
 	unsigned nr_events = 1;
+#endif
 
 	char ch;
 	char *short_opts = "wrp:o:s:avdh";
@@ -129,6 +131,7 @@ int main(int argc, char *argv[])
 	IOT_PRINT("rd:%d wr:%d, oft:%d size:%d pattern:0x%x\n",
 		rd, wr, offset, size, wrdata_pattern);
 
+#if 0
 	if (aio) {
 		IOT_PRINT("Using AIO to do IO test\n");
 
@@ -142,6 +145,7 @@ int main(int argc, char *argv[])
 		for (i = 0; i < AIO_IOCNT; i++)
 			p[i] = &io[i];
 	}
+#endif
 
 	strcpy(dev, argv[optind]);
 	fd = open(dev, O_RDWR | O_CREAT | O_SYNC | O_DIRECT, S_IRWXU | S_IRWXG | S_IRWXO);
@@ -155,7 +159,7 @@ int main(int argc, char *argv[])
 		IOT_PRINT("wr:buf:%p pattern:0x%x\n", wrbuf, wrdata_pattern);
 
 		if (aio) {
-			io_prep_pwrite(&io[0], fd, wrbuf, size, offset);
+			//io_prep_pwrite(&io[0], fd, wrbuf, size, offset);
 		} else {
 			ret = pwrite(fd, wrbuf, size, offset);
 			assert(ret != -1);
@@ -168,13 +172,14 @@ int main(int argc, char *argv[])
 		memset(rdbuf, 0x0, size);
 
 		if (aio) {
-			io_prep_pread(&io[0], fd, rdbuf, size, offset);
+			//io_prep_pread(&io[0], fd, rdbuf, size, offset);
 		} else {
 			ret = pread(fd, rdbuf, size, offset);
 			assert(ret != -1);
 		}
 	}
 
+#if 0
 	if (aio) {
 		ret = io_submit(ctx, 1, p);
 		assert(ret == 1);
@@ -189,6 +194,7 @@ int main(int argc, char *argv[])
 			}
 		}
 	}
+#endif
 
 	if (verify) {
 		printf("Verify: TBD\n");
@@ -202,8 +208,10 @@ int main(int argc, char *argv[])
 		free(rdbuf);
 	}
 
+#if 0
 	if (aio)
 		io_destroy(ctx);
+#endif
 
 	close(fd);
 

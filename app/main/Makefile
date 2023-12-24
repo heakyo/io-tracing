@@ -1,7 +1,7 @@
 CFLAGS = -O0 -g
 
 all: main
-	objdump -dS main > main.dis
+	#objdump -dS main > main.dis
 
 install:
 	cp -a main /usr/local/bin
@@ -10,7 +10,7 @@ uninstall:
 	rm /usr/local/bin/main
 
 main: main.o
-	$(CC) $(CFLAGS) -o $@ $< -laio
+	$(CC) $(CFLAGS) -o $@ $<
 
 main.o: main.i
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -20,4 +20,4 @@ main.o: main.i
 
 .PHONY:clean
 clean:
-	rm main *.i *.o *.dis -rf
+	rm -rf main *.i *.o *.dis

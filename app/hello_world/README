@@ -1,6 +1,9 @@
 # Disable ASLR
 sysctl kern.elf64.aslr.enable=0
 
+# Check Program Header
+readelf -lW main
+
 /libexec/ld-elf.so.1
 hdr:entry:8000 type:3 phoff:64 phnum:8 phentsize:56
 
