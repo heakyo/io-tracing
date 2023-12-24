@@ -19,8 +19,35 @@ BEGIN
 	printf("unmapped_buf:0x%p", *unmapped_bufp);
 }
 /*common*************************************************************************************/
+fget_read:entry,
+fget_read:return
+/execname == proc/
+{}
 
 /*entry**************************************************************************************/
+kern_preadv:entry
+/execname == proc/
+{}
+
+getblk_core:entry
+/execname == proc/
+{
+	this->gbc_vp = args[0];
+	this->gbc_blkno = args[1];
+	this->gbc_size = args[2];
+
+	printf("args:vp:%p blkno:%d size:%d",
+		this->gbc_vp,
+		this->gbc_blkno,
+		this->gbc_size
+		);
+}
+
+ffs_vgetf:entry
+/execname == proc/
+{
+}
+
 ufs_lookup_ino:entry
 /execname == proc/
 {}
@@ -280,7 +307,7 @@ g_disk_start:entry
                         this->as_bp->bio_cmd,
                         this->as_bp->bio_offset,
                         this->as_bp->bio_bcount,
-                        this->as_bp->bio_pblkno,
+                        this->as_bp->bio_pblkno, /* pblkno * 512: offset of da2 */
                         this->as_bp->bio_data,
                         this->as_bp->bio_length,
                         this->as_bp->bio_from,
@@ -398,10 +425,28 @@ ffs_read:return
 			self->fr_iov_base,
 			self->fr_iov_len
 			);
-	trace(this->v);
+	/*trace(this->v);*/
 }
 
 ufs_lookup_ino:return
+/execname == proc/
+{}
+
+ffs_vgetf:return
+/execname == proc/
+{}
+
+getblk_core:return
+/execname == proc/
+{
+	printf("args:vp:%p blkno:%d size:%d",
+		this->gbc_vp,
+		this->gbc_blkno,
+		this->gbc_size
+		);
+}
+
+kern_preadv:return
 /execname == proc/
 {}
 /********************************************************************************************/
