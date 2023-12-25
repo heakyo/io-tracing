@@ -1,0 +1,8 @@
+set debug-file-directory /usr/lib/debug:/usr/local/lib/debug:/var/crash/tools/symbols:/var/crash/tools/symbols/usr/lib/debug:/var/crash/tools/symbols/usr/local/lib/debug
+set history save on
+set print pretty on
+
+define hexdump
+	dump binary memory /tmp/dump.bin $arg0 $arg0+$arg1
+	shell hexdump -C /tmp/dump.bin
+end
