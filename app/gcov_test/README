@@ -1,0 +1,9 @@
+### 1. Compile main
+gmake
+
+### 2. Run Code Coverage
+gmake cov
+
+### 3. Run HTTP to Check Code Coverage
+gmake cov
+gmake pyhttp
