@@ -1,0 +1,4011 @@
+#
+# Example .gdbinit config file
+#
+# $Id$
+#
+
+######################################################
+#    		marvin definition    		     #
+######################################################
+#set auto-load safe-path /
+set history save on
+set print pretty on
+set print array-indexes on
+set disassemble-next-line off
+define tgt_conn
+	printf "Begin connection ..... \n", 
+	#set substitute-path /root/isilon_mnt/src /home/marvin/isilon/isi-src/onefs
+	set substitute-path /b/mnt/src /home/marvin/isilon/isi-src/freebsd/bk-onefs/onefs	
+	cd /home/marvin/symbols	
+	file kernel
+	target remote localhost:9801
+	#target remote localhost:1801
+	#target remote localhost:2801
+	printf "connected ..... \n", 
+end
+
+######################################################
+#    		marvin gold_dust    		     #
+######################################################
+define gd_show_bh_anchor
+	printf "Show bh_anchor ..... \n",
+
+	set $_anchor = bh_anchor
+	if (! $_anchor.tqh_first)
+		printf "bh_anchor is empty!"
+		return
+	end
+	
+	set $node = $_anchor.tqh_first
+	printf "BH(%s)\n", $node->name
+end
+######################################################
+#    A note about scoping in gdb script functions    #
+######################################################
+#
+# All variables in this file, even ones declared in functions, are global.
+# This means that naming collisions can occur, and lead to unexpected
+# consequences in your scripts. It's recommended to prefix variable names
+# declared inside functions with some unique prefix. One way to do it is 
+# to come up with an acronym for the function name, and prefix all variable
+# names in that function with it. For example, all "local" variables declared
+# in print_uipc_client are prefixed with "puc".
+
+
+#############################################################
+#    A note about script compatibility for released version #
+#############################################################
+#
+# Very often due to change of code between releases, the user
+# defined commands (scripts) may also need to change. But throwing
+# away old script is not good since developer often has need to
+# triage issues reported on old released product. Thus it is very
+# helpful to keep a working copy of original script while changing
+# it to work with current version.
+#
+# To achieve that, we shall follow some basic conventions.
+#
+# 1. If this is a new command definition, which doesn't work
+#    for past releases, then we can print out minimum supported
+#    version in the command's document. E.g.
+#
+#          printf "only works after JAWS_7111 \n"
+#
+# 2. Similarly, if an existing command definition doesn't work
+#    for current / future release, then we can print out maximum
+#    reversion supported in the command's document. E.g.
+#
+#          printf "only works prior to JAWS_7111 \n"
+#
+# 3. If existing command definition needs to be modified (assuming
+#    current OneFS revision is MOBY_VERSION), then we can do something
+#    simple as below:
+#
+#       ## above is common script
+#
+#       if (osrevision < $MOBY_VERSION)
+#             ... old script ...
+#       else
+#             ... new script ...
+#
+#       ## after is common script
+#
+#     if it makes sense, we can also move old or new script to a
+#     separate routines and invoke them here
+#
+
+#
+# constants of released versions
+#
+define init_version_numbers
+        set $HABANERO_VERSION =      0x600000000000000L
+        set $CHOPU_VERSION =         0x605000000000000L
+        set $MAVERICKS_VERSION =     0x700000000000000L
+        set $MAVERICKS_701_VERSION = 0x700010000000000L
+        set $MAVERICKS_702_VERSION = 0x700020000000000L
+        set $WAIKIKI_VERSION =       0x701000000000000L
+        set $JAWS_VERSION =          0x701010000000000L
+        set $JAWS_7111_VERSION =     0x701015000100000L
+        set $MOBY_VERSION =          0x702000000000000L
+        set $RIPTIDE_VERSION =       0x800000000000000L
+end
+
+init_version_numbers
+
+###########################################
+#    A note about kernel debug symbols    #
+###########################################
+#
+# The easiest way to get your kernel symbols to work correctly is the following:
+#
+# First, for official builds (i.e. b.4444r):
+# 
+# 1. Find all debug symbol files in the build's object tree. For drivers, these
+#   look like "<driver_name>.ko.debug". For the kernel, its just "kernel.debug".
+#   Object trees for a particular build can be found at
+#   leetbiox:/ifs/builds/<build_name>/obj/kernel.<arch>/build/src
+#
+# 2. Copy said files into a symbols directory (probably named after the
+# build number + arch).
+#
+# 3. Strip off the .debug extension from all symbol files
+#
+# The above 3 steps can be accomplished by a fairly simple shell script,
+# which I leave as an exercise to the reader :)
+#
+# 4. Run 'gdb kernel' from the directory and make sure your .gdbinit contains
+# the line 'set solib-search-path .'
+#
+# The process is similar for builds you compile yourself, except the object
+# files reside in your SVN tree at <branch>/obj/kernel.<arch>.
+#
+# Unfortunately, at the time of this writing (04/23/2008) things don't work
+# quite so well for 64-bit builds. In particular, the line
+# 'set solib-search-path .' fails to properly load symbols for drivers (kernel
+# symbols work fine). There is a work-around that kind of works for efs.ko, but
+# doesn't get everything loaded properly. The work-around is to use the
+# load_efs_ko function defined below.
+
+set solib-search-path .
+
+# Function: load_efs_ko
+#
+# Loads efs.ko symbol file for 64-bit debugging. Does not seem to properly load
+# addresses of some (all?) global structs / variables, for example g_gmp_info.
+# This makes it impossible to examine their contents. But at least, this lets
+# us look at stacks, function arguments, and local variables.
+
+define load_efs_ko
+	add-symbol-file ./efs.ko efs_ko_text_start
+end
+
+
+
+# Examples for shortcuts to remotely debug nodes. To do remote kernel debugging,
+# you need to run condemux (svn/tools/head/condemux) and split the gdb traffic
+# from regular console traffic (to a separate port). Then, run
+# 'target remote <address/hostname of condemux box>:<gdb port>' from GDB to
+# connect. This will only work if the remote node is in the gdb kernel debugger.
+# By default, nodes drop into ddb. To transition to gdb mode, enter the 'gdb'
+# command followed by the 'step' command at the ddb prompt on the console of
+# the remote node.
+
+define node
+        target remote localhost:9392
+        shared
+end
+# define node1
+#         target remote localhost:9392
+#         shared
+# end
+# define node2
+#         target remote localhost:9394
+#         shared
+# end
+# define node3
+#         target remote localhost:9396
+#         shared
+# end
+
+set height 0
+set print pretty on
+set confirm no
+
+#############################################
+#    Various utility functions are below    #
+#############################################
+
+#
+# Helper function for printing uipc_clients
+#
+define print_uipc_client
+       set $puc_cl = $arg0
+       printf "ipc_client %p (pid %d): {\n", $puc_cl, $puc_cl->pid
+       printf "  state: %d\n", $puc_cl->state
+       printf "  user sock: %p", ((struct unpcb *)($puc_cl->so->so_pcb))->unp_conn->unp_socket
+       printf "kern sock: %p, ", $puc_cl->so
+       printf "state %#x, ", $puc_cl->so ? $puc_cl->so->so_state : 0
+       printf "overflow? %d\n", $puc_cl->overflowed
+       if ($puc_cl->so)
+         set $puc_sobuf = $puc_cl->so->so_snd
+         printf "  snd_sock: cc %u ", $puc_sobuf.sb_cc
+	 printf "hiwat %u ", $puc_sobuf.sb_hiwat
+	 printf "mbcnt %u ", $puc_sobuf.sb_mbcnt
+	 printf "head %p\n", $puc_sobuf.sb_mb
+	 set $puc_sobuf = $puc_cl->so->so_rcv
+	 printf "  rcv_sock: cc %u ", $puc_sobuf.sb_cc
+	 printf "hiwat %u ", $puc_sobuf.sb_hiwat
+	 printf "mbcnt %u ", $puc_sobuf.sb_mbcnt
+	 printf "head %p\n", $puc_sobuf.sb_mb
+       end
+       set $puc_mbcnt = 0
+       set $puc_clcnt = 0
+       set $puc_mbuf = $puc_cl->inq
+       while ($puc_mbuf)
+         set $puc_nextmbuf = $puc_mbuf->m_hdr.mh_nextpkt
+	 while ($puc_mbuf)
+	   if (($puc_mbuf->m_hdr.mh_flags & 1) && ($puc_mbuf->M_dat.MH.MH_dat.MH_ext.ext_type == 1))
+	     set $puc_clcnt = $puc_clcnt + 1
+	   end
+	   set $puc_mbcnt = $puc_mbcnt + 1
+	   set $puc_mbuf = $puc_mbuf->m_hdr.mh_next
+	 end
+	 if ($puc_nextmbuf)
+	   set $puc_mbuf = $puc_nextmbuf
+	 end
+       end
+       set $puc_size = 0
+       set $puc_mbuf = $puc_cl->inq
+       while ($puc_mbuf)
+         set $puc_size = $puc_size + $puc_mbuf->m_hdr.mh_len
+	 set $puc_mbuf = $puc_mbuf->m_hdr.mh_next
+       end
+       printf "  inq: %p, ", $puc_cl->inq
+       printf "mbcnt: %lu ", $puc_mbcnt
+       printf "clcnt: %lu ", $puc_clcnt
+       printf "size: %d = ", $puc_size
+       printf "len: %d\n", $puc_cl->inq_len
+       if ($puc_cl->inq && $puc_cl->inq->m_hdr.mh_len >= sizeof(struct iitp_header))
+         set $puc_hdr = (struct iitp_header *)($puc_cl->inq->m_hdr.mh_data)
+	 printf "  (blocked on incomplete message "
+	 printf "size: %d, ", $puc_hdr->size
+	 printf "dst_sid: %d)\n", $puc_hdr->dst_sid
+       end
+       #session_list
+       set $puc_sess = $puc_cl->session_list->slh_first
+       if ($puc_sess)
+         printf "  session_list: {\n"
+	 while ($puc_sess)
+	   printf "    { local_sid: %d, ", $puc_sess->local_sid
+	   printf "remote_sid: %d, ", $puc_sess->remote_sid
+	   printf "remote_devid: %d }", $puc_sess->remote_devid
+	   set $puc_sess = $puc_sess->client_link->sle_next
+	   if ($puc_sess)
+	     printf ",\n"
+	   end
+	 end
+	 printf "  \n}\n"
+       end
+       #listener_list
+       set $puc_list = $puc_cl->listener_list->slh_first
+       if ($puc_list)
+         printf "  listener_list: { "
+	 while ($puc_list)
+	   printf "xid: %d", $puc_list->xid
+	   set $puc_list = $puc_list->client_link->sle_next
+	   if ($puc_list)
+	     printf ", "
+	   end
+	 end
+	 printf " }\n"
+       end
+       printf "}\n"
+end
+
+#
+# Prints out information about all uipc clients.
+# This is a gdb equivalent of sysctl.efs.rbm.uipc.clients
+#
+define uipc_clients
+       if (g_ipc.mounted)
+	  set $uc_client = g_ipc.client_list->slh_first
+	  while ($uc_client)
+	    print_uipc_client $uc_client
+	    set $uc_client = $uc_client->link->sle_next
+	  end
+       else
+         printf "g_ipc not mounted!\n"
+       end
+end
+
+#
+# Helper function for make_geom_graph
+#
+define print_g_geom
+       set $pgg_geom = $arg0
+       if ($pgg_geom)
+         printf "%s_%s ", $pgg_geom->class->name, $pgg_geom->name
+	 printf "[shape=Mrecord, color=\"green\","
+	 printf "label=\"%s_%s", $pgg_geom->class->name, $pgg_geom->name
+	 printf "|{rank=%d|flags=%d", $pgg_geom->rank, $pgg_geom->flags
+	 if ($pgg_geom->flags & 0x01)
+	   printf "\\nWITHER"
+	 end
+	 printf "}\"];\n"
+       end
+end
+
+#
+# Helper function for make_geom_graph
+#
+define print_g_provider
+       set $pgp_pp = $arg0
+       if ($pgp_pp)
+         printf "%s [shape=Mrecord, color=\"red\", ", $pgp_pp->name
+	 printf "label=\"%s|", $pgp_pp->name
+	 printf "{acr=%d|acw=%d|ace=%d}", $pgp_pp->acr, $pgp_pp->acw, $pgp_pp->ace
+       	 printf "|flags=%d", $pgp_pp->flags
+	 if ($pgp_pp->flags & 0x01)
+	   printf "\\nCANDELETE"
+	 end
+	 if ($pgp_pp->flags & 0x02)
+	   printf "\\nWITHER"
+	 end
+	 if ($pgp_pp->flags & 0x04)
+	   printf "\\nORPHAN"
+	 end
+	 printf "}\"];\n"
+	 printf "%s -> ", $pgp_pp->name
+	 printf "%s_%s;\n", $pgp_pp->geom->class->name, $pgp_pp->geom->name
+         if ($pgp_pp->orphan->tqe_next)
+	    printf "%s -> %s ", $pgp_pp->name, $pgp_pp->orphan->tqe_next->name
+	    printf "[label=\"orphan\"];\n"
+	 end
+       end
+end
+
+#
+# Helper function for make_geom_graph
+#
+define print_g_consumer
+       set $pgc_cp = $arg0
+       set $pgc_cpi = $arg1
+       if ($pgc_cp)
+         set $pgc_geom = $pgc_cp->geom
+         printf "%s_%s_c%d ", $pgc_geom->class->name, $pgc_geom->name, $pgc_cpi
+         printf "[shape=Mrecord, color=\"blue\", "
+         printf "label=\"%s_%s_c%d" ,$pgc_geom->class->name, $pgc_geom->name, $pgc_cpi
+         printf "|{acr=%d|acw=%d|ace=%d}\"];\n", $pgc_cp->acr, $pgc_cp->acw, $pgc_cp->ace
+         set $pgc_pp = $pgc_cp->provider
+         if ($pgc_pp)
+           printf "%s_%s_c%d", $pgc_geom->class->name, $pgc_geom->name, $pgc_cpi
+	   printf " -> %s;\n", $pgc_pp->name
+         end
+         printf "%s_%s -> ", $pgc_geom->class->name, $pgc_geom->name
+	 printf "%s_%s_c%d;\n", $pgc_geom->class->name, $pgc_geom->name, $pgc_cpi
+       end
+end
+
+#
+# Outputs the in-memory graph of all GEOM structures, in dotty format.
+# Copy/paste into a .dot file and run dotty to generate the graph.
+#
+define make_geom_graph
+       set $reffed_only = $arg0
+       printf "digraph \"geom\" { \n" 
+       set $geom_class = g_classes->lh_first
+       while ($geom_class)
+	 set $geom = $geom_class->geom->lh_first
+	 while ($geom)
+	   set $reffed = 0
+	   set $geom_reffed = 0
+	   set $pp = $geom->provider->lh_first
+	   while ($pp)
+	     if ($pp->acr != 0 || $pp->acw != 0|| $pp->ace != 0)
+	       set $reffed = 1
+	       set $geom_reffed = 1
+	     else
+	       set $reffed = 0
+	     end
+	     if (!$reffed_only || $reffed)
+	       print_g_provider $pp
+             end
+	     set $pp = $pp->provider->le_next
+	   end
+	   set $cp = $geom->consumer->lh_first
+	   set $cpi = 0
+	   while ($cp)
+	     if ($cp->acr != 0 || $cp->acw != 0 || $cp->ace != 0)
+	       set $reffed = 1
+	       set $geom_reffed = 1
+	     else
+	       set $reffed = 0
+	     end
+	     if (!$reffed_only || $reffed)
+	       print_g_consumer $cp $cpi
+	     end
+	     set $cpi = $cpi + 1
+	     set $cp = $cp->consumer->le_next
+	   end
+	   if (!$reffed_only || $geom_reffed)
+	     print_g_geom $geom
+	   end
+	   set $geom = $geom->geom->le_next
+	 end
+	 set $geom_class = $geom_class->class->le_next
+       end
+       printf "}\n"
+end
+
+#
+# Helper function for showumapools
+#
+define showumazone_before_riptide
+       set $suz_umazone=$arg0
+       set $suz_ukeg = $suz_umazone->uz_keg
+       if ($suz_umazone)
+	  set $suz_cachefree = 0
+	  if (($suz_ukeg->uk_flags & 0x2000) == 0)
+	     set $suz_cpu = 0
+	     while ($suz_cpu <= mp_maxid)
+		   if ((all_cpus & (1 << ($suz_cpu))) != 0)
+		      set $suz_cache = &($suz_umazone->uz_cpu[$suz_cpu])
+		      if ($suz_cache->uc_allocbucket)
+			 set $suz_cachefree = $suz_cachefree + $suz_cache->uc_allocbucket->ub_cnt
+		      end
+		      if ($suz_cache->uc_freebucket)
+			 set $suz_cachefree = $suz_cachefree + $suz_cache->uc_freebucket->ub_cnt
+		      end
+		      set $suz_cpu = $suz_cpu + 1
+		   end
+	     end
+	  end
+	  set $suz_bucket = $suz_umazone->uz_full_bucket->lh_first
+	  while ($suz_bucket)
+		set $suz_cachefree = $suz_cachefree + $suz_bucket->ub_cnt
+		set $suz_bucket = $suz_bucket->ub_link->le_next
+	  end
+	  set $suz_totalfree = $suz_ukeg->uk_free + $suz_cachefree
+	  set $suz_totalused = ($suz_ukeg->uk_ipers * ($suz_ukeg->uk_pages / $suz_ukeg->uk_ppera)) - $suz_totalfree
+	  set $suz_totalfree = $suz_totalfree * $suz_ukeg->uk_rsize
+	  set $suz_totalused = $suz_totalused * $suz_ukeg->uk_rsize
+	  printf "UMA Zone \"%s\" at %p mem used: %ld mem free: %ld\n", $suz_umazone->uz_name, $suz_umazone, $suz_totalused, $suz_totalfree
+       end
+end
+#
+# Helper function for showumapools
+#
+define showumakeg_before_riptide
+       set $suk_umakeg=$arg0
+       if ($suk_umakeg)
+	  set $suk_umaz = $suk_umakeg->uk_zones->lh_first
+	  while ($suk_umaz)
+		showumazone_before_riptide $suk_umaz
+		set $suk_umaz=$suk_umaz->uz_link->le_next
+	  end
+       end
+end
+#
+# Like showmallocpools, but for all UMA zones
+#
+define showumapools_before_riptide
+       set $sup_umak=uma_kegs->lh_first
+       set $sup_totalused = 0
+       while ($sup_umak)
+	     showumakeg_before_riptide $sup_umak
+	     set $sup_umak=$sup_umak->uk_link->le_next
+       end
+       printf "Total UMA memory usage: %ld bytes\n", $sup_totalused
+end
+
+#
+# Helper function for showumapools (for RIPTIDE)
+#
+define showumakeg
+	set $suz_ukeg=$arg0
+
+	set $suz_umazone = $suz_ukeg->uk_zones->lh_first
+	while ($suz_umazone)
+	    set $suz_cachefree = 0
+	    if (($suz_ukeg->uk_flags & 0x2000) == 0)
+	      set $suz_cpu = 0
+	      while ($suz_cpu <= mp_maxid)
+	        # CPU_SETSIZE=128 bits, BITSET_BITS = sizeof(long)*8, BITSET_WORDS=128/(8*8)=2
+	        set $suz_cpu_bitset_bits = sizeof(long)*8
+	        set $suz_cpu_bitset_word = $suz_cpu/$suz_cpu_bitset_bits
+	        if (all_cpus.__bits[$suz_cpu_bitset_word] & (1 << ($suz_cpu)) != 0)
+	          set $suz_cache = &($suz_umazone->uz_cpu[$suz_cpu])
+	          if ($suz_cache->uc_allocbucket)
+	            set $suz_cachefree = $suz_cachefree + $suz_cache->uc_allocbucket->ub_cnt
+		  end
+	          if ($suz_cache->uc_freebucket)
+		    set $suz_cachefree = $suz_cachefree + $suz_cache->uc_freebucket->ub_cnt
+	          end
+	          set $suz_cpu = $suz_cpu + 1
+	        end
+	      end
+	    end
+	    set $suz_bucket = $suz_umazone->uz_buckets->lh_first
+	    while ($suz_bucket)
+	      set $suz_cachefree = $suz_cachefree + $suz_bucket->ub_cnt
+	      set $suz_bucket = $suz_bucket->ub_link->le_next
+	    end
+
+	    set $suz_totalfree = $suz_ukeg->uk_free + $suz_cachefree
+	    set $suz_totalused = ($suz_ukeg->uk_ipers * ($suz_ukeg->uk_pages / $suz_ukeg->uk_ppera)) - $suz_totalfree
+	    set $suz_totalfree = $suz_totalfree * $suz_ukeg->uk_rsize
+	    set $suz_totalused = $suz_totalused * $suz_ukeg->uk_rsize
+	    set $sup_totalused = $sup_totalused + $suz_totalused
+
+	    printf "%31s,  %p,%9ld,%9ld,%9ld\n", $suz_umazone->uz_name, $suz_umazone, $suz_totalused, $suz_totalfree, $suz_umazone->uz_size
+
+	    set $suz_umazone = $suz_umazone->uz_link->le_next
+       end
+end
+
+#
+# Like showmallocpools, but for all UMA zones (for RIPTIDE)
+#
+define showumapools
+       set $sup_umak=uma_kegs->lh_first
+       set $sup_totalused = 0
+       printf "                  UMA Zone Name,             address, mem_used, mem_free,  uz_size\n"
+       while ($sup_umak)
+	     showumakeg $sup_umak
+	     set $sup_umak=$sup_umak->uk_link->le_next
+       end
+       printf "Total UMA memory usage: %ld bytes\n", $sup_totalused
+end
+
+#
+# Walk of allocated memory in a uma zone.
+#
+
+define _uma_slab_next_free
+	set $umsnf_slab=$arg0
+	set $umsnf_pos=$arg1
+	set $umsnf_keg=$arg2
+
+	if ($umsnf_keg->uk_flags & 0x0400) # UMA_ZONE_REFCNT
+		set $umsnf_ret=((uma_slabrefcnt_t)$umsnf_slab)->um_freelist[$umsnf_pos].us_item
+	else
+		set $umsnf_ret=$umsif_slab->um_freelist[$umsnf_pos].us_item
+	end
+end
+
+define _uma_slab_is_free
+	set $umsif_slab=$arg0
+	set $umsif_ipos=$arg1
+	set $umsif_keg=$arg2
+	set $umsif_ret=0
+	set $umsif_count=$umsif_slab->us_freecount
+
+	set $umsif_fpos = $umsif_slab->us_firstfree
+	while ($umsif_fpos != $umsif_ipos && $umsif_count > 0)
+		set $umsif_count=$umsif_count-1
+		_uma_slab_next_free($umsif_slab, $umsif_fpos, $umsif_keg)
+		$umsif_fpos=$umsnf_ret
+	end
+
+	if ($umsif_count > 0)
+		set $umsif_ret=1
+	end
+end
+
+define _uma_bucket_is_free
+	set $umbif_bucket=$arg0
+	set $umbif_item=$arg1
+	set $umbif_ret=0
+
+	set $umbif_pos=0
+	while(!$umbif_ret && $umbif_pos < $umbif_bucket->ub_cnt)
+		if ($umbif_item == $umbif_bucket->ub_bucket[$umbif_pos])
+			set $umbif_ret=1
+		end
+		set $umbif_pos=$umbif_pos+1
+	end
+end
+
+define _uma_cache_is_free
+	set $umcif_zone=$arg0
+	set $umcif_item=$arg1
+	set $umcif_ret=0
+
+	set $umcif_bucket=$umcif_zone->uz_full_bucket.lh_first
+	while ($umcif_bucket && !$umcif_ret)
+		_uma_bucket_is_free($umcif_bucket, $umcif_item)
+		if ($umbif_ret)
+			set $umcif_ret=$umbif_ret
+		end
+		set $umcif_bucket=$umcif_bucket->ub_link.le_next
+	end
+
+	set $umcif_cpu=0
+	while (!$umcif_ret && $umcif_cpu < mp_ncpus)
+		_uma_bucket_is_free(&$umcif_zone->uz_cpu[$umcif_cpu].uc_freebucket)
+		if ($umbif_ret)
+			set $umcif_ret=1
+		else
+			_uma_bucket_is_free(&$umcif_zone->uz_cpu[$umcif_cpu].uc_allocbucket)
+			if ($umbif_ret)
+				set $umcif_ret=1
+			end
+		end
+	end
+end
+
+define _umawalk_advance
+	set $umw_ret=(void *)0
+	if ($umw_slab)
+		set $umw_slab_pos=$umw_slab_pos+1
+		if ($umw_slab_pos == $umw_keg->uk_ipers)
+			set $umw_slab=$umw_slab->us_head.us_type._us_link.lh_next
+			set $umw_slab_pos = 0
+			if (!$umw_slab && $umw_part_slab)
+				set $umw_slab=$umw_keg->uk_full_slab.lh_first
+				set $umw_part_slab=0
+			end
+		end
+	end
+end
+
+define umawalk_next
+	set $umw_checked=0
+	_umawalk_advance()
+	while ($umw_slab && !$umw_checked)
+		set $umw_checked=1
+		if ($umw_part_slab)
+			_uma_slab_is_free($umw_slab, $umw_slab_pos, $umw_keg)
+			if ($umsif_ret)
+				set $umw_checked=0
+			end
+		end
+		if ($umw_checked)
+			set $umw_item=(void*)($umw_slab->us_data + $umw_keg->uk_rsize * $umw_slab_next_pos)
+			_uma_cache_is_free($umw_zone, $umw_ret)
+			if ($umcif_ret)
+				set $umw_checked=0
+			end
+		end
+		if (!umw_checked)
+			_umawalk_advance()
+		end
+	end
+	if ($umw_slab)
+		set $umw_ret=$umw_item
+	else
+		set $umw_ret=(void*)0
+	end
+end
+
+define umawalk_start
+	set $umw_zone=$arg0
+	set $umw_keg=$umw_zone->uz_keg
+	set $umw_part_slab=1
+	set $umw_slab=$umw_keg->uk_part_slab.lh_first
+	set $umw_slab_pos=-1
+	umawalk_next()
+end
+
+# Print all bios associated with a buf
+
+define _bio_is_for_buf
+	set $bifb_bip=$arg0
+	set $bifb_bp=$arg1
+
+	while ($bifb_bip && $bifb_bip->bio_done != g_vfs_done)
+		set $bifb_bip=$bifb_bip->bio_parent
+	end
+
+	set $bifb_ret=($bifb_bip && $bifb_bp == $bifb_bip->bio_caller2)
+end
+
+define showbiosforbuf
+	set $sbfb_bp=$arg0
+
+	umawalk_start(biozone)
+
+	while ($umw_ret)
+		set $sbfb_bip=(struct bio *)$umw_ret
+		_bio_is_for_buf($sbfb_bip, $sbfb_bp)
+		if ($bifb_ret)
+			print $sbfb_bip
+			print *$sbfb_bip
+		end
+		umawalk_next()
+	end
+end
+
+
+define binary
+        set $a=0x80000000
+        set $q=0
+        while ($a)
+                if ( $arg0 & $a )
+                        echo 1
+                else
+                        echo 0
+                end        
+                set $a=$a >> 1
+                set $q=$q + 1
+                if ( ! ( $q & 0x3 )) 
+                        echo :
+                end
+        end
+        echo \n
+end
+
+define showbufhash
+        set $bht=bufhashtbl
+        set $i=0
+        while ($i <= bufhashmask)
+                echo Slot\ 
+                output $i
+                echo :\  
+                set $el=$bht[$i].lh_first
+                output/x $el
+                while ($el)
+                        set $el=$el->b_hash->le_next
+                        echo \ ->\ 
+                        output/x $el        
+                end
+                set $i=($i+1)
+                echo \n
+        end
+end
+
+# Show memory usage for all malloc pools
+# $arg0 == output mask
+# 0x01 - do not prune empty entries
+# 0x10 - do not include negative values in total usage
+#	 see comment in get_malloc_pigs
+define showmallocpools
+        set $smp_mtp=kmemstatistics
+        set $smp_total=0
+        set print address off
+        while ($smp_mtp)
+		set $smp_stat=(struct malloc_type_internal*)$smp_mtp->ks_handle
+		set $smp_cpu=0
+		set $smp_memuse=(int64_t)0
+		while ($smp_cpu < 16)
+		  	if ((all_cpus & (1 << $smp_cpu)))
+				set $smp_memuse+=(int64_t)$smp_stat->mti_stats[$smp_cpu].mts_memalloced
+				set $smp_memuse-=(int64_t)$smp_stat->mti_stats[$smp_cpu].mts_memfreed
+			end
+			set $smp_cpu+=1
+		end
+		if ($smp_memuse || ($arg0 & 0x01))
+			printf "%s: %lld\n", $smp_mtp->ks_shortdesc, $smp_memuse
+			if ($smp_memuse > 0 || !($arg0 & 0x10))
+				set $smp_total+=$smp_memuse
+			end
+		end
+                set $smp_mtp=$smp_mtp->ks_next
+        end
+        echo Total:\ 
+        output $smp_total
+        echo \n
+        set print address on
+end
+
+##############################
+# Function: print_call_stack #
+##############################
+#
+# Prints the stack saved in a struct call_stack
+#
+# Arguments:
+# arg0 - pointer to a struct call_stack
+#
+define print_call_stack
+	set $pcs_call_stack = $arg0
+	if ($pcs_call_stack->has_resized != 0)
+	  set $pcs_ptr = (instruction_ptr *) $pcs_call_stack->u.alloced_stack
+	end
+	if ($pcs_call_stack->has_resized == 0)
+	  set $pcs_ptr = (instruction_ptr *) $pcs_call_stack->u.initial_stack
+	end
+	set $pcs_i = 0
+	while ($pcs_i < $pcs_call_stack->size && $pcs_ptr[$pcs_i] != 0)
+	  printf "\t"
+	  info symbol $pcs_ptr[$pcs_i]
+	  set $pcs_i = $pcs_i + 1
+	end
+end
+
+########################
+# Function: show_stack #
+########################
+#
+# Prints a stack (i386 version).
+#
+# XXX: This assumes 2 pages per stack, which is currently true but may change
+# at some point. If it does, update the multiplier of 8192 below.
+#
+# Arguments:
+# arg0 - saved value of ebp register
+# arg1 - saved value of eip register
+#
+define show_stack
+        set $orig=$arg0
+        set $myebp=$arg0
+        set $myeip=$arg1
+
+        while ($myebp && $myebp < $orig + (8192*2) && $myebp >= $orig)
+                # show arguments to current function, and current function
+                #printf "(ebp=%p) ", $myebp
+                #printf "(%p,%p,%p,%p,%p,%p,%p,%p)", ((void**)$myebp)[2], ((void**)$myebp)[3], ((void**)$myebp)[4], ((void**)$myebp)[5] , ((void**)$myebp)[6] , ((void**)$myebp)[7] , ((void**)$myebp)[8]  , ((void**)$myebp)[9] 
+                printf "\t\t"
+                info symbol $myeip
+                set $myeip=((void**)$myebp)[1]
+                set $myebp=((void**)$myebp)[0]
+        end
+end
+
+###############################
+# Function: show_thread_stack #
+###############################
+#
+# Prints a stack of a thread (i386 version)
+#
+# Arguments:
+# arg0 - a pointer to a struct thread (which should be context-switched out,
+#   i.e. not currently running on any CPU)
+#
+define show_thread_stack
+        set $sts_td = (struct thread*)$arg0
+        set $sts_pcb = ((struct pcb*)($sts_td->td_kstack + (8192 * $sts_td->td_kstack_pages) - sizeof(struct pcb)))
+        set $sts_ebp = ((void*)($sts_pcb->pcb_ebp))
+        set $sts_eip = ((void*)($sts_pcb->pcb_eip))
+        show_stack $sts_ebp $sts_eip
+end
+
+########################
+# Function: show_procs #
+########################
+#
+# Prints the stacks of all processes in the system. Keep in mind that
+# the currently executing thread will not display a stack. The thread
+# ids can be used to switch to the particular thread, but you must
+# first run 'info threads'. This is the i386 version.
+#
+# Arguments: none
+#
+define show_procs
+        set $p=allproc->lh_first
+	set $sp_tid = 1
+        while ($p != 0)
+		printf "Process Name: %s pid %d ppid %d ptr %p\n",	\
+			(char*)&($p->p_comm[0]), $p->p_pid, 		\
+			$p->p_pptr->p_pid, $p
+                set $t=$p->p_threads->tqh_first
+                echo Process Name:\ \ 
+                output (char*)&($p->p_comm[0]) 
+                printf " pid %d\n", $p->p_pid
+                echo \n
+		while ($t != 0)
+			printf "\tThread 0x%x (thread id %d), ", $t, $sp_tid
+			if ($t->td_wmesg)
+                        	printf "wmesg: \"%s\"\n", $t->td_wmesg
+			else
+				printf "wmesg: (null)\n"
+			end
+			if ($t->td_blocked)
+                        	printf "\t\tTD_BLOCKED: %x\n", $t->td_blocked
+			end
+			set $pcb=((struct pcb*)($t->td_kstack + ($t->td_kstack_pages*8192) - sizeof(struct pcb)))
+			set $pcbebp = (void*)($pcb->pcb_ebp)
+			set $pcbeip = (void*)($pcb->pcb_eip)
+                        show_stack $pcbebp $pcbeip
+                        set $t=$t->td_plist->tqe_next
+			set $sp_tid = $sp_tid + 1
+                end
+	        set $p=$p->p_list.le_next
+        end
+end
+
+##########################
+# Function: show_stack64 #
+##########################
+#
+# Prints a stack (amd64 version)
+#
+# Arguments:
+# arg0 - pointer to a struct thread
+# arg1 - saved value of rbp register
+# arg2 - saved value of rip register
+#
+define show_stack64
+	set $thr=$arg0
+        set $orig=$arg1
+        set $myrbp=$arg1
+        set $myrip=$arg2
+
+        while ($myrbp && $myrbp < $orig + (4096*$thr->td_kstack_pages) && $myrbp >= $orig)
+                # show arguments to current function, and current function
+                #printf "(ebp=%p) ", $myebp
+                #printf "(%p,%p,%p,%p,%p,%p,%p,%p)", ((void**)$myebp)[2], ((void**)$myebp)[3], ((void**)$myebp)[4], ((void**)$myebp)[5] , ((void**)$myebp)[6] , ((void**)$myebp)[7] , ((void**)$myebp)[8]  , ((void**)$myebp)[9] 
+                printf "\t\t"
+                info symbol $myrip
+                set $myrip=((void**)$myrbp)[1]
+                set $myrbp=((void**)$myrbp)[0]
+        end
+end
+
+#################################
+# Function: show_thread_stack64 #
+#################################
+#
+# Prints a stack of a thread (amd64 version)
+#
+# Arguments:
+# arg0 - a pointer to a struct thread.
+#
+define show_thread_stack64
+        set $sts_td = (struct thread*)$arg0
+        if ($sts_td->td_state == TDS_RUNNING)
+                if ($sts_td->td_tid == dumptid)
+                        set $sts_pcb=dumppcb
+                else
+	                set $sts_pcb= &stoppcbs[$sts_td->td_oncpu]
+                end
+        else
+	        set $sts_pcb = ((struct pcb*)($sts_td->td_kstack + (4096 * $sts_td->td_kstack_pages) - sizeof(struct pcb)))
+        end
+        set $sts_rbp = ((void*)($sts_pcb->pcb_rbp))
+        set $sts_rip = ((void*)($sts_pcb->pcb_rip))
+        show_stack64 $sts_td $sts_rbp $sts_rip
+end
+
+##########################
+# Function: show_procs64 #
+##########################
+#
+# Prints the stacks of all processes in the system. The thread
+# ids can be used to switch to the particular thread, but you must
+# first run 'info threads'. This is the amd64 version.
+#
+# Arguments: none
+#
+define show_procs64
+	set $p=allproc->lh_first
+	set $sp_tid = 1
+	while ($p != 0)
+		printf "Process Name: %s pid %d ppid %d\n",		\
+			(char*)&($p->p_comm[0]), $p->p_pid, 		\
+			($p->p_pptr ? $p->p_pptr->p_pid : -1)
+		if ($p->p_args != 0)
+			set $i = 0
+			printf "args = "
+			set $arglength = $p->p_args->ar_length 
+			while ($i < $arglength)
+				if ($p->p_args->ar_args[$i] != 0)
+					printf "%c", $p->p_args->ar_args[$i]
+				else
+					printf " "
+				end
+				set $i = $i + 1
+			end
+		end
+		echo \n
+
+		set $p_rss=$p->p_vmspace->vm_pmap->pm_stats.resident_count
+		set $t=$p->p_threads->tqh_first
+		while ($t != 0)
+			printf "\tThread 0x%lx (tid %d), ", $t, $sp_tid
+			if ($t->td_inhibitors & 4 == 0)
+				set $p_rss=$p_rss + $t->td_kstack_pages
+			end
+			if ($t->td_altkstack_obj != 0)
+				set $p_rss=$p_rss + $t->td_altkstack_pages
+			end
+			if ($t->td_wmesg)
+				printf "wmesg: \"%s\"\n", $t->td_wmesg
+			else
+				printf "wmesg: (null)\n"
+			end
+			if ($t->td_blocked)
+				printf "\t\tTD_BLOCKED: %lx\n", $t->td_blocked
+			end
+			if ($t->td_oncpu != 0xff)
+				printf "\t\tON_CPU: %d\n", $t->td_oncpu
+			end
+                        if ($t->td_state == TDS_RUNNING)
+                                if ($t->td_tid == dumptid)
+                                        set $pcb=dumppcb
+                                else
+	                                set $pcb= &stoppcbs[$t->td_oncpu]
+                                end
+                        else
+	                        set $pcb = ((struct pcb*)($t->td_kstack + (4096 * $t->td_kstack_pages) - sizeof(struct pcb)))
+                        end
+			set $pcbrbp = (void*)($pcb->pcb_rbp)
+			set $pcbrip = (void*)($pcb->pcb_rip)
+			show_stack64 $t $pcbrbp $pcbrip
+			set $t=$t->td_plist->tqe_next
+			set $sp_tid = $sp_tid + 1
+		end
+		printf "rss: %d\n", $p_rss * 4096
+		set $p=$p->p_list.le_next
+	end
+end
+
+
+##############################
+# Function: show_procs64_rss #
+##############################
+#
+# Prints out all of the procs and the rss usage.
+#
+# Arguments: none
+#
+define show_procs64_rss
+	set $p=allproc->lh_first
+	set $sp_tid = 1
+	while ($p != 0)
+		set $p_rss=$p->p_vmspace->vm_pmap->pm_stats.resident_count
+		set $t=$p->p_threads->tqh_first
+		while ($t != 0)
+			if ($t->td_inhibitors & 4 == 0)
+				set $p_rss=$p_rss + $t->td_kstack_pages
+			end
+			if ($t->td_altkstack_obj != 0)
+				set $p_rss=$p_rss + $t->td_altkstack_pages
+			end
+			set $t=$t->td_plist->tqe_next
+		end
+		printf "Process Name: %s pid %d ppid %d rss %d\n",	\
+			(char*)&($p->p_comm[0]), $p->p_pid, 		\
+			($p->p_pptr ? $p->p_pptr->p_pid : -1), $p_rss*4096
+		set $p=$p->p_list.le_next
+	end
+end
+document show_procs64_rss
+Prints out all of the procs and the rss usage.
+end
+
+#
+# Shows a list of all procs, without printing stacks
+#
+define show_proclist
+        set $p=allproc->lh_first
+        while ($p != 0) 
+		printf "Process Name: %s pid %d ppid %d ptr %p\n",	\
+			(char*)&($p->p_comm[0]), $p->p_pid, 		\
+			($p->p_pptr ? $p->p_pptr->p_pid : -1), $p
+                set $p=$p->p_list.le_next
+        end
+end
+
+#
+# Get a pointer to the curthread
+#
+define find_curthread
+        set $p = allproc->lh_first
+        while ($p != 0)
+                set $t = $p->p_threads->tqh_first
+                while ($t != 0)
+                        if ($t->td_state == TDS_RUNNING)
+                                printf "thead %#llx running on cpu %d\n", $t, $t->td_oncpu
+                        end
+                        set $t = $t->td_plist->tqe_next
+                end
+                set $p = $p->p_list.le_next
+        end
+end     
+
+#
+# Find thread by td_tid.
+# $arg0 = td_tid in decimal.
+#
+define find_thread_by_tid
+        set $p = allproc->lh_first
+        set $found = 0
+        while ($p != 0 && $found == 0)
+                set $t = $p->p_threads->tqh_first
+                while ($t != 0 && $found == 0)
+                        if ($t->td_tid == $arg0)
+                                printf "thead = %#x\n", $t
+                                set $found = 1
+                        end
+                        set $t = $t->td_plist->tqe_next
+                end
+                set $p = $p->p_list.le_next
+        end
+end
+
+define inodehash
+        set $i=0
+        while ($i < ihash) 
+                set $head=$ihashtbl[$i].lh_first
+                while ($head)
+                        echo chain:\ 
+                        output $i
+                        echo ptr:\ 
+                        output $head
+                        echo inode:\ 
+                        output (struct inode*)$head->i_vnode->v_data
+                end
+        end
+end
+
+define show_mbinfo
+        echo \ len=
+        output $arg0.m_hdr.mh_len
+        echo \ mh_data=
+        output/x (int)$arg0.m_hdr.mh_data
+        set $flags=$arg0.m_hdr.mh_flags
+        if ($flags & 2) 
+                echo \n\t\t
+                echo \ packetheader\ (len \ 
+                output $arg0.M_dat.MH.MH_pkthdr.len
+                echo )
+        end
+        if ($flags & 1)
+                echo \n\t\t
+                echo \ ext\ data=
+                output/x (int)$arg0.M_dat.MH.MH_dat.MH_ext.ext_buf
+                echo \ size=
+                output $arg0.M_dat.MH.MH_dat.MH_ext.ext_size
+                if ($arg0.M_dat.MH.MH_dat.MH_ext.ext_type & 1)
+                        echo \ cluster
+                end
+                if (!($arg0.M_dat.MH.MH_dat.MH_ext.ext_type & 1))
+                        echo \ freefunc=
+                        info symbol $arg0.M_dat.MH.MH_dat.MH_ext.ext_free
+                end
+        end
+end
+
+define show_mbdata
+        output/x *$arg0.m_hdr.mh_data@$arg0.m_hdr.mh_len
+end
+
+define show_mbdataasrbmmsg 
+        set print pretty off
+        output *(struct efsid_header*)$arg0.m_hdr.mh_data
+        set $type=((struct efsid_header*)$arg0.m_hdr.mh_data)->type
+        set $data=($arg0.m_hdr.mh_data) + sizeof(struct efsid_header)
+        if ($type == 125) 
+                echo \ domain:\ 
+                output ((int*)$data)[0]
+                echo \ direction:\ 
+                output ((int*)$data)[1]
+                set $nelem=((int*)$data)[2]
+                set $j=0
+                set $realdata=(struct genlk_trace_info*)($data + 12)
+                output *$realdata@$nelem
+        else                        
+                output/x *($arg0.m_hdr.mh_data + sizeof(struct efsid_header))@($arg0.m_hdr.mh_len - sizeof(struct efsid_header))
+        end
+end
+
+define show_mbchaingen
+        set $m=*$arg0
+        set $n=$arg0
+        while ($n)
+                echo mbuf:\ 
+                output $n
+                $arg1 $m
+                set $n=$m.m_hdr->mh_next
+                if ($n)
+                        set $m=*$n
+                        echo \n -->\  
+                else
+                        echo \n
+                end
+        end
+end
+
+define show_workqueue
+        set $w=(struct dwt_work_entry*)rbm_dwt.workq.queue.stqh_first
+        while ($w)
+                echo entry:\ 
+                output $w 
+                echo \ 
+                output $w->work.action
+                if ($w->work.action == DWT_LOOPBACK) 
+                        show_mbdataasrbmmsg $w->work.data.loopback.mbuf
+                end
+                set $w=(struct dwt_work_entry*)$w->header->entries->stqe_next
+                echo \n
+        end
+end
+
+define show_rbmdevice
+	set $devid=$arg0
+	set $bucket=0
+	set $info=(struct rbm_device *) 0
+	# annoying by-hand hash iteration
+	while ($bucket < rbm_devices.num_buckets)
+		if (rbm_devices.num_buckets > 64)
+			set $info=(struct rbm_device_info *) rbm_devices.storage.pages[$bucket/64][$bucket%64]->slh_first
+		else
+			set $info=(struct rbm_device_info *) rbm_devices.storage.chains[$bucket]->slh_first
+		end
+		while ($info)
+			if ($info->rdi_devid == $devid)
+				output $info
+				printf "\n"
+				output $info->rdi_device
+				printf "\n"
+				loop_break
+			end
+			set $info=(struct rbm_device_info *) $info->rdi_h.bucket_link.sle_next
+		end
+		if ($info)
+			loop_break
+		end
+		set $bucket = $bucket + 1
+	end
+	if (!$info)
+		printf "Device %d not found in hash\n", $devid
+	end
+end
+
+# Print out the last $arg0 entries of the dexitcode ring
+define dexitcode
+	set $count=$arg0
+	set $ringsize=sizeof(dexitcode_ring)/sizeof(struct dexitcode_entry)
+	set $i=(int)dexitcode_pos-$count
+	if ($i < 0)
+		set $i=0
+	end	    
+	printf "%d -> %d\n", $i, dexitcode_pos
+	while ($i < dexitcode_pos)
+		set $entry=&dexitcode_ring[$i % $ringsize]
+		if ($entry->function && $entry->error)
+			printf "%5d: %d from %s\n", \
+				$entry->pid, $entry->error, $entry->function
+		end
+		set $i=$i+1
+	end
+end
+
+define dexitcode_pid
+	set $dp_count=$arg0
+	set $dp_pid=$arg1
+	set $dp_ringsize=sizeof(dexitcode_ring)/sizeof(struct dexitcode_entry)
+	set $dp_i=(int)dexitcode_pos-$dp_count
+	if ($dp_i < 0)
+		set $dp_i=0
+	end	    
+	printf "%d -> %d\n", $dp_i, dexitcode_pos
+	while ($dp_i < dexitcode_pos)
+		set $dp_entry=&dexitcode_ring[$dp_i % $dp_ringsize]
+		if ($dp_entry->function && $dp_entry->error \
+			&& $dp_entry->pid == $dp_pid)
+			printf "%5d: %d from %s\n", \
+				$dp_entry->pid, $dp_entry->error, $dp_entry->function
+		end
+		set $dp_i=$dp_i+1
+	end
+end
+
+# Iterate through a TAILQ
+define tailq_foreach
+	set $anchor = $arg0
+	set $iter = $anchor.tqh_first
+	while ($iter)
+		print *$iter
+		set $iter = $iter.link.tqe_next
+	end
+end
+
+# Iterate through a LIST
+define list_foreach
+	set $anchor = $arg0
+	set $iter = $anchor.lh_first
+	while ($iter)
+		print *$iter
+		set $iter = $iter.link.le_next
+	end
+end
+
+# Print all B-tree leaf items for item list at $arg0
+define bli_foreach
+	set $anchor = $arg0
+	set $iter = $anchor.tqh_first
+	while ($iter)
+		if ($iter->type == BTREE_LEAF_MEM_ITEM)
+			set $item = (struct btree_leaf_mem_item *)$iter
+			printf "mem item at %p, data bytes: %4d ", $item, $item->data_size
+			printf "entry bytes: %4d\n", $item->item.class->key_size + sizeof(struct btree_leaf_od_entry_base)
+			print *$item
+		else
+			set $item = (struct btree_leaf_range_item *)$iter
+			printf "range item at %p, data bytes: %4d ", $item, ($item->data_end - $item->data_beg)
+			printf "entry bytes: %4d\n", ($item->entries_end - $item->entries_beg)
+			print *$item
+		end
+
+		set $iter = $iter.link.tqe_next
+	end
+end
+
+# Print all B-tree inner items for item list at $arg0
+define bii_foreach
+	set $anchor = $arg0
+	set $iter = $anchor.tqh_first
+	while ($iter)
+		if ($iter->type == BTREE_INNER_MEM_ITEM)
+			set $item = (struct btree_inner_mem_item *)$iter
+			printf "mem item at %p, baddr count: %4d, ", $item, $item->baddr_count
+			printf "child: %p\n", $item->child
+			print *$item
+		else
+			set $item = (struct btree_inner_range_item *)$iter
+			printf "range item at %p, entries: [%p, %p] ", $item, $item->entries_beg, $item->entries_end
+			printf "baddrs: [%p, %p]\n", $item->baddrs_beg, $item->baddrs_end
+			print *$item
+		end
+
+		set $iter = $iter.link.tqe_next
+	end
+end
+
+# imp - ifs mount point
+define imp
+	print *((struct ifsmount *)efs_mp->mnt_data)
+end
+
+# drv_get - Find the dde for drive with ldnum $arg0
+define drv_get
+	set $ldnum = $arg0
+	set $drives = ((struct ifsmount *)efs_mp->mnt_data)->im_ld->dg_drives._tmap
+	set $iter = $drives._elements + $ldnum
+	if ($iter >= ($drives._elements + $drives._used))
+		printf "ldnum out of map\n"
+	else
+		print *((struct drv_drive_entry *)*$iter)
+		print ((struct drv_drive_entry *)*$iter)
+	end
+end
+
+define disk_get
+	set $ldnum = $arg0
+	set $drives = ((struct ifsmount *)efs_mp->mnt_data)->im_ld->dg_drives._tmap
+	set $iter = $drives._elements + $ldnum
+	if ($iter >= ($drives._elements + $drives._used))
+		printf "ldnum out of map\n"
+	else
+		set $drv_ent = ((struct drv_drive_entry *)*$iter)
+		set $iter = $drv_ent->dde_cp->provider->geom
+		while ($iter->consumer.lh_first != 0)
+			set $iter = $iter->consumer.lh_first->provider->geom
+		end
+		print ((struct disk *)$iter->softc)
+	end
+end
+document disk_get
+Returns the struct disk* pointer that's at the bottom of the geom stack,
+for a given ldnum
+end
+
+# baddr - Format a baddr in $arg0
+define baddr
+	set $addr = (struct ifs_baddr)$arg0
+	set $bits = ((uint64_t)$addr._bits1 << 8) | $addr._bits2
+	if ($addr._bits2)
+		set $baddr_size = 512
+	else
+		set $baddr_size = 8192
+	end
+	set $bits = $bits & ~(((uint64_t)$baddr_size - 1) >> 6)
+	set $offset = $bits << 5
+
+	printf "addr_offset = %llu (%#llx)\n", $offset, $offset
+	printf "addr_size = %u (%#x)\n", $baddr_size, $baddr_size
+	printf "addr_bn = %u (%#x)\n", $offset >> 13, $offset >> 13
+	printf "addr_sector = %u (%#x)\n", $offset >> 9, $offset >> 9
+end
+document baddr
+Formats and prints a baddr or iaddr 
+end
+
+# syslogdump - Dump in-memory syslog
+#   $arg0 - file to dump to
+define syslogdump
+	if (msgbufp->msg_wseq > msgbufp->msg_size)
+		set $start = msgbufp->msg_ptr + (msgbufp->msg_wseq % msgbufp->msg_size)
+		set $end = msgbufp->msg_ptr + msgbufp->msg_size
+		dump memory $arg0 $start $end
+
+		set $start = msgbufp->msg_ptr
+		set $end = msgbufp->msg_ptr + (msgbufp->msg_wseq % msgbufp->msg_size)
+		append memory $arg0 $start $end
+	else
+		set $start = msgbufp->msg_ptr
+		set $end = msgbufp->msg_ptr + (msgbufp->msg_wseq % msgbufp->msg_size)
+		dump memory $arg0 $start $end
+	end
+end
+
+# findbuf_inhash - Look up a buf for a given sector / drv:
+#   $arg0 = sector
+#   $arg1 = drv
+define findbuf_inhash
+   set $HASH_MASK = (0xfffffe0)
+   set $BX_BKGRDMARKER = (0x00000020)
+
+   set $bh = bufhash
+   set $sector = (daddr_t)$arg0
+   set $bo = &($arg1->drv_devvp->v_bufobj)
+     # Find the index into the hashtable
+   if (!$bo->bo_buf_hash_cache.valid || ($sector & $HASH_MASK) != \
+       ($bo->bo_buf_hash_cache.blkno & $HASH_MASK))
+       set $base = ((u_int32_t)$bo ^ ((u_int32_t)$sector & $HASH_MASK))
+   else
+       set $base = $bo->bo_buf_hash_cache.base
+   end
+
+   set $index = ($base + ($sector & ~$HASH_MASK)) & bufhashmask
+   printf "index = %d\t", $index
+
+   # Lookup the buf in the hashtable
+   set $bp = (struct buf *)(bufhash[$index].lh_first)
+   while ($bp != 0 && $bp->b_bufobj != $bo || $bp->b_lblkno != $sector || \
+       ($bp->b_xflags & $BX_BKGRDMARKER))
+       set $bp = $bp->b_hashnext.le_next
+   end
+
+   printf "bp = %p\n", $bp
+end 
+
+define find_buf_in_dde
+	set $first = $arg0
+	set $item = $arg1
+	set $curr_item = $first->dec_context
+	set $next = $first
+	while ($next && $curr_item != $item)
+		set $next = $next->dec_next.stqe_next
+		set $curr_item = $next->dec_context
+	end
+	if ($curr_item == $item)
+		print $next
+	end
+end
+
+define findbuf_in_lists
+  set $fbil_devvp = $arg0
+  set $fbil_lblkno = $arg1
+  set $fbil_found = 0
+
+  set $fbil_bp = $fbil_devvp->v_bufobj.bo_dirty.bv_hd.tqh_first
+  while ($fbil_bp)
+    if ($fbil_bp->b_lblkno == $fbil_lblkno)
+      print $fbil_bp
+      set $fbil_found = 1
+      loop_break
+    end
+    set $fbil_bp = $fbil_bp.b_bobufs.tqe_next
+  end
+  if ($fbil_found == 0)
+    set $fbil_bp = $fbil_devvp->v_bufobj.bo_clean.bv_hd.tqh_first
+    while ($fbil_bp)
+      if ($fbil_bp->b_lblkno == $fbil_lblkno)
+        print $fbil_bp
+        loop_break
+      end
+      set $fbil_bp = $fbil_bp.b_bobufs.tqe_next
+    end
+  end
+end
+
+define find_multibuf_in_lists
+  set $fbil_devvp = $arg0
+  set $fbil_lblknos = $arg1
+  set $fbil_nlblknos = $arg2
+  set $fbil_nfound = 0
+
+  set $fbil_bp = $fbil_devvp->v_bufobj.bo_dirty.bv_hd.tqh_first
+  while ($fbil_bp)
+    set $fbil_idx = 0
+    set $fbil_bp_lblkno = $fbil_bp->b_lblkno
+    while ($fbil_idx < $fbil_nlblknos)
+      set $fbil_lblkno = $fbil_lblknos[$fbil_idx]
+      if ($fbil_bp_lblkno == $fbil_lblkno)
+        print $fbil_bp
+        set $fbil_found = $fbil_nfound + 1
+        loop_break
+      end
+      set $fbil_idx = $fbil_idx + 1
+    end
+    if ($fbil_found == $fbil_nlblknos)
+      loop_break
+    end
+    set $fbil_bp = $fbil_bp.b_bobufs.tqe_next
+  end
+  if ($fbil_found < $fbil_nlblknos)
+    set $fbil_bp = $fbil_devvp->v_bufobj.bo_clean.bv_hd.tqh_first
+    while ($fbil_bp)
+      set $fbil_idx = 0
+      set $fbil_bp_lblkno = $fbil_bp->b_lblkno
+      while ($fbil_idx < $fbil_nlblknos)
+        set $fbil_lblkno = $fbil_lblknos[$fbil_idx]
+        if ($fbil_bp_lblkno == $fbil_lblkno)
+          print $fbil_bp
+          set $fbil_found = $fbil_nfound + 1
+          loop_break
+        end
+        set $fbil_idx = $fbil_idx + 1
+      end
+      if ($fbil_found == $fbil_nlblknos)
+        loop_break
+      end
+      set $fbil_bp = $fbil_bp.b_bobufs.tqe_next
+    end
+  end
+end
+
+define offsetof
+        print &((struct $arg0 *)0)->$arg1
+end
+
+
+define show_mbchaindata
+        show_mbchaingen $arg0 show_mbdata
+end
+
+define show_mbchain
+        show_mbchaingen $arg0 show_mbinfo
+end
+
+###############################
+# Function: print_lock_owners #
+###############################
+#
+# Given a pointer to a struct lock_entry (genlk_local.c version), prints
+# all the owners (as struct thread pointers) of the lock.
+
+define print_lock_owners
+	set $plo_entry = $arg0
+	set $plo_owner = $plo_entry->owners->lh_first
+	while ($plo_owner != 0)
+	  output $plo_owner
+	  printf "\n"
+	  set $plo_owner = $plo_owner->link->le_next
+	end
+	
+end
+
+##############################
+# Function: dump_genlk_state #
+##############################
+#
+# A generic genlk domain dump function.  All output is consistent with dotty format.
+
+# Resource printing helper functions
+#
+# Underbar functions print dotty object names
+# Label functions print contents to put in a dotty node
+
+# LIN domain
+define print_lin_underbar
+	set $plu_a = (((uint8_t *)&$arg0->resource)[4])
+	set $plu_b = (((uint8_t *)&$arg0->resource)[3])
+	set $plu_c = (((uint8_t *)&$arg0->resource)[2])
+	set $plu_d = (((uint8_t *)&$arg0->resource)[1])
+	set $plu_e = (((uint8_t *)&$arg0->resource)[0])	
+	printf "r_lin_lock__%x_%02x%02x_%02x%02x", $plu_a, $plu_b, $plu_c, $plu_d, $plu_e
+end
+
+define print_lin_label
+	set $pll_a = (((uint8_t *)&$arg0->resource)[4])
+	set $pll_b = (((uint8_t *)&$arg0->resource)[3])
+	set $pll_c = (((uint8_t *)&$arg0->resource)[2])
+	set $pll_d = (((uint8_t *)&$arg0->resource)[1])
+	set $pll_e = (((uint8_t *)&$arg0->resource)[0])	
+	printf " [ shape = diamond, label = \"(lin.lock: %x:%02x%02x:%02x%02x)\" ];\n", $pll_a, $pll_b, $pll_c, $pll_d, $pll_e
+end
+
+# Calculate ifs_addr_size from struct ifs_addr
+define mds_block_addr_size
+       if ($arg0->bits2 == 0)
+         set $mbas = 1 << 13
+       else
+         set $mbas = 512
+       end
+end
+
+# Calculate ifs_addr_offset from struct ifs_addr
+define mds_block_addr_offset
+       # 6 == IFS_MIN_ADDR_SHIFT
+       set $mbao_bits = ((uint64_t)$arg0->bits1 << 8) | $arg0->bits2
+       mds_block_addr_size $arg0
+       set $mbao_size = $mbas
+       set $mbao_bits = $mbao_bits & ~(((uint64_t)$mbao_size - 1) >> 6)
+       set $mbao_bits = $mbao_bits << (6 - 1)
+end
+
+# MDS Block domain
+define print_mds_block_underbar
+       set $mbu = (struct ifs_addr *)&$arg0->resource
+       mds_block_addr_size $mbu
+       mds_block_addr_offset $mbu
+       printf "r_mds_block_%d_%d_%llu_%d", $mbu->devid, $mbu->drive, $mbao_bits, $mbas
+end
+
+define print_mds_block_label
+       set $mbu = (struct ifs_addr *)&$arg0->resource
+       mds_block_addr_size $mbu
+       mds_block_addr_offset $mbu
+       printf " [ shape = diamond, label = \"(mds_block.lock: %d, %d, %llu:%d)\" ];\n", $mbu->devid, $mbu->drive, $mbao_bits, $mbas
+end
+
+# Delete domain
+define print_delete_underbar
+       	set $pdu_a = (((uint8_t *)&$arg0->resource)[4])
+	set $pdu_b = (((uint8_t *)&$arg0->resource)[3])
+	set $pdu_c = (((uint8_t *)&$arg0->resource)[2])
+	set $pdu_d = (((uint8_t *)&$arg0->resource)[1])
+	set $pdu_e = (((uint8_t *)&$arg0->resource)[0])	
+	printf "r_delete_lock__%x_%02x%02x_%02x%02x", $pdu_a, $pdu_b, $pdu_c, $pdu_d, $pdu_e
+end
+
+define print_delete_label
+	set $pdl_a = (((uint8_t *)&$arg0->resource)[4])
+	set $pdl_b = (((uint8_t *)&$arg0->resource)[3])
+	set $pdl_c = (((uint8_t *)&$arg0->resource)[2])
+	set $pdl_d = (((uint8_t *)&$arg0->resource)[1])
+	set $pdl_e = (((uint8_t *)&$arg0->resource)[0])	
+	printf " [ shape = diamond, label = \"(delete.lock: %x:%02x%02x:%02x%02x)\" ];\n", $pdl_a, $pdl_b, $pdl_c, $pdl_d, $pdl_e
+end
+
+# Process is common
+define print_process_underbar
+	printf "p_%d_%d", local_devid, $arg0
+end
+
+define print_process_label
+	printf " [ shape = box, label = \"(<%d,%d>, %s)\" ];\n", local_devid, $arg0, $arg1
+end
+
+define print_genlk_entry
+	set $dgs_j = $arg0
+	while ($dgs_j != 0)
+	  if ($dgs_j->owners.lh_first)
+	    # only print resources that have at least one valid owner
+	    if $lin
+	      print_lin_underbar $dgs_j
+	      print_lin_label $dgs_j
+	    end
+	    if $mds_block
+	      print_mds_block_underbar $dgs_j
+	      print_mds_block_label $dgs_j
+	    end	
+	    if $delete
+	      print_delete_underbar $dgs_j
+	      print_delete_label $dgs_j
+	    end
+	    set $dgs_k = $dgs_j->owners.lh_first
+	    # print all owners
+            while ($dgs_k)
+	      print_process_underbar $dgs_k->pid
+	      print_process_label $dgs_k->pid $dgs_k->comm
+	      if $lin
+	        print_lin_underbar $dgs_j
+	      end
+	      if $mds_block
+	        print_mds_block_underbar $dgs_j
+	      end	
+	      if $delete
+	        print_delete_underbar $dgs_j
+	      end
+	      printf "->"
+	      print_process_underbar $dgs_k->pid
+	      if ($dgs_k->exclusive)
+	        printf " [ label = \"exclusive\\nowned:%f\" ];\n", $dgs_current_time - $dgs_k->started
+	      else
+	        printf " [ label = \"shared\\nowned:%f\" ];\n", $dgs_current_time - $dgs_k->started
+	      end
+	      set $dgs_k = $dgs_k->link.le_next
+	    end
+          end
+          if ($dgs_j->he.bucket_link.sle_next == 0)
+            set $dgs_j = 0
+          else
+            set $dgs_j = (struct i_lock_entry *)(((uint8_t *)$dgs_j->he.bucket_link.sle_next) + $dgs_entries->key_offset)
+          end
+        end
+end
+
+# The main lock state dump function
+define dump_genlk_state
+	# Multiplex between different lock domains
+	# $arg0 == 1 --> g_lin_lock
+	# $arg0 == 2 --> g_mds_block_lock
+	# $arg0 == 3 --> g_delete_lock
+
+	set $lin = $arg0 == 1
+	set $mds_block = $arg0 == 2
+	set $delete = $arg0 == 3
+
+	if ($lin)
+	  set $dgs_entries = g_lin_lock.genlk->local->entries
+	  set $dgs_waiters = g_lin_lock.genlk->local->waiters
+	end
+	if ($mds_block)
+	  set $dgs_entries = g_mds_block_lock.genlk->local->entries
+	  set $dgs_waiters = g_mds_block_lock.genlk->local->waiters
+	end
+	if ($delete)
+	  set $dgs_entries = g_delete_lock.genlk->local->entries
+	  set $dgs_waiters = g_delete_lock.genlk->local->waiters
+	end
+
+	# NOT ACCURATE - not sure if this is possible to get working, since the clock isn't being updated, the cached value might be incorrect
+	set $dgs_current_time = 1000000*(((struct bintime *)&timehands->th_offset).sec) + ((1000000*(((struct bintime *)&timehands->th_offset).frac))>>32)
+
+	# Where does 11 come from?
+	# 32 bit
+	# PAGE_SHIFT = 13
+	# POINTER_SHIFT = 2
+	# ISI_HASH_PAGE_SHIFT = PAGE_SHIFT - POINTER_SHIFT = 13 - 2 = 11
+	# 64 bit
+	# PAGE_SHIFT = 12
+	# POINTER_SHIFT = 3
+	# ISI_HASH_PAGE_SHIFT = PAGE_SHIFT - POINTER_SHIFT = 12 - 3 = 9
+
+	if (mp_ncpus > 1)
+	  set $ISI_HASH_PAGE_SHIFT = 9
+	else
+	  set $ISI_HASH_PAGE_SHIFT = 11
+	end
+
+	# Print owner state from entries hash
+	if (($dgs_entries->num_buckets >> $ISI_HASH_PAGE_SHIFT) > 1)
+	  set $dgs_page = 0
+	  while ($dgs_page < ($dgs_entries->num_buckets >> $ISI_HASH_PAGE_SHIFT))
+	    set $dgs_i = 0
+	    while ($dgs_i < (1 << $ISI_HASH_PAGE_SHIFT))
+ 	      if ($dgs_entries.storage.pages[$dgs_page][$dgs_i].slh_first)
+	        set $dgs_j = (struct i_lock_entry *)(((uint8_t *)$dgs_entries.storage.pages[$dgs_page][$dgs_i].slh_first) + $dgs_entries->key_offset)
+                print_genlk_entry $dgs_j
+	      end
+	      set $dgs_i = $dgs_i + 1
+	    end
+	    set $dgs_page = $dgs_page + 1
+	  end
+	else
+	  set $dgs_i = 0
+	  while ($dgs_i < $dgs_entries->num_buckets)
+	    if ($dgs_entries.storage.chains[$dgs_i].slh_first)
+	      set $dgs_j = (struct i_lock_entry *)(((uint8_t *)$dgs_entries.storage.chains[$dgs_i].slh_first) + $dgs_entries->key_offset)
+              print_genlk_entry $dgs_j
+	    end
+	    set $dgs_i = $dgs_i + 1
+	  end
+	end
+
+	# Print waiter state from waiters list
+	set $dgs_i = $dgs_waiters.tqh_first
+	while ($dgs_i)
+	  print_process_underbar $dgs_i->proc->p_pid
+	  print_process_label $dgs_i->proc->p_pid $dgs_i->proc->p_comm
+	  if $lin
+	    print_lin_underbar $dgs_i
+	    print_lin_label $dgs_i
+	  end
+	  if $mds_block
+	    print_mds_block_underbar $dgs_i
+	    print_mds_block_label $dgs_i
+	  end	
+	  if $delete
+	    print_delete_underbar $dgs_i
+	    print_delete_label $dgs_i
+	  end
+	  print_process_underbar $dgs_i->proc->p_pid
+	  printf "->"
+
+	  if $lin
+	    print_lin_underbar $dgs_i
+	  end
+	  if $mds_block
+	    print_mds_block_underbar $dgs_i
+	  end	
+	  if $delete
+	    print_delete_underbar $dgs_i
+	  end
+
+	  if ($dgs_i->exclusive)
+	    printf " [ label = \"exclusive\\nwaiting:%f\" ];\n", $dgs_current_time - $dgs_i->started
+	  else
+	    printf " [ label = \"shared\\nwaiting:%f\" ];\n", $dgs_current_time - $dgs_i->started
+	  end
+	  set $dgs_i = $dgs_i->link.tqe_next
+	end
+end
+
+##################################
+# Function: dump_lin_genlk_state #
+##################################
+#
+# Dump the lock state of the lin domain
+
+define dump_lin_genlk_state
+	printf "digraph \"locks\" {\n"
+	dump_genlk_state 1
+	printf "}\n"
+end
+
+########################################
+# Function: dump_mds_block_genlk_state #
+########################################
+#
+# Dump the lock state of the mds block domain
+
+define dump_mds_block_genlk_state
+	printf "digraph \"locks\" {\n"
+	dump_genlk_state 2
+	printf "}\n"
+end
+
+#####################################
+# Function: dump_delete_genlk_state #
+#####################################
+#
+# Dump the lock state of the delete domain
+
+define dump_delete_genlk_state
+	printf "digraph \"locks\" {\n"
+	dump_genlk_state 3
+	printf "}\n"
+end
+
+##################################
+# Funciton: dump_all_genlk_state #
+##################################
+#
+# Dump the lock state of all genlk domains
+
+define dump_all_genlk_state
+	printf "digraph \"locks\" {\n"
+	dump_genlk_state 1 #g_lin_lock
+	dump_genlk_state 2 #g_mds_block_lock
+	dump_genlk_state 3 #g_delete_lock
+	printf "}\n"
+end
+
+#############################
+# Function: find_lock_entry #
+#############################
+#
+# Prints a struct lock_entry (genlk_local.c version) for a particular
+# genlk lock. This only works for 8-byte keys (lins, baddrs), which means
+# it works with the linlock, mdsblocklock, and delete lock domains.
+#
+# Arguments:
+# arg0 - a pointer to a struct genlk_local
+# arg1 - the resource (LIN or baddr) represented as a 64-bit unsigned integer
+# 
+# Prints all lock_entries associated with the resource. There should be zero or
+# one entries, pass it as an argument to print_lock_owners to see which
+# thread(s) on the local node own the lock. If print_lock_owners doesn't output
+# anything, then the lock is lazy.
+
+define find_lock_entry
+	set $fle_genlk = $arg0
+	set $fle_gl = $fle_genlk->local
+	set $fle_gle = $fle_gl->entries
+	set $fle_resource = $arg1
+
+	# compute the hash bucket
+        set $ih8_key_ptr = (u_int8_t *) &$arg1
+        set $ih8_a = (u_int32_t) 0x9e3779b9
+        set $ih8_b = (u_int32_t) 0x9e3779b9
+        set $ih8_c = (u_int32_t) 0
+        set $ih8_a = (u_int32_t) $ih8_a + *(const u_int32_t *) &$ih8_key_ptr[0]
+        set $ih8_b = (u_int32_t) $ih8_b + *(const u_int32_t *) &$ih8_key_ptr[4]
+
+	# do the mix(a,b,c)
+        set $ih8_a = $ih8_a - $ih8_b
+        set $ih8_a = $ih8_a - $ih8_c
+        set $ih8_a = $ih8_a ^ ($ih8_c >> 13)
+
+	set $ih8_b = $ih8_b - $ih8_c
+        set $ih8_b = $ih8_b - $ih8_a
+        set $ih8_b = $ih8_b ^ ($ih8_a << 8)
+
+	set $ih8_c = $ih8_c - $ih8_a
+        set $ih8_c = $ih8_c - $ih8_b
+        set $ih8_c = $ih8_c ^ ($ih8_b >> 13)
+
+	set $ih8_a = $ih8_a - $ih8_b
+        set $ih8_a = $ih8_a - $ih8_c
+        set $ih8_a = $ih8_a ^ ($ih8_c >> 12)
+
+	set $ih8_b = $ih8_b - $ih8_c
+        set $ih8_b = $ih8_b - $ih8_a
+        set $ih8_b = $ih8_b ^ ($ih8_a << 16)
+
+	set $ih8_c = $ih8_c - $ih8_a
+        set $ih8_c = $ih8_c - $ih8_b
+        set $ih8_c = $ih8_c ^ ($ih8_b >> 5)
+
+	set $ih8_a = $ih8_a - $ih8_b
+        set $ih8_a = $ih8_a - $ih8_c
+        set $ih8_a = $ih8_a ^ ($ih8_c >> 3)
+
+	set $ih8_b = $ih8_b - $ih8_c
+        set $ih8_b = $ih8_b - $ih8_a
+        set $ih8_b = $ih8_b ^ ($ih8_a << 10)
+
+	set $ih8_c = $ih8_c - $ih8_a
+        set $ih8_c = $ih8_c - $ih8_b
+        set $ih8_c = $ih8_c ^ ($ih8_b >> 15)
+
+	set $fle_offset = $ih8_c & ($fle_gle->num_buckets - 1)
+	set $fle_bi = 0
+	while ($fle_bi < $fle_gle->num_buckets)
+	  set $fle_i = ($fle_bi + $fle_offset) % $fle_gle->num_buckets
+	  set $fle_he = $fle_gle->buckets[$fle_i]->slh_first
+	  while ($fle_he != 0)
+	    set $fle_entry = (struct lock_entry*)(((char*)$fle_he)-8)
+	    # printf "resource = %llu\n", $fle_entry->resource
+	    if ($fle_entry->resource == $fle_resource)
+	      output $fle_entry
+	      printf "\n"
+	      set $fle_he = 0
+	      set $fle_bi = $fle_gle->num_buckets
+	    else
+	      set $fle_he = $fle_he->bucket_link->sle_next
+	    end
+	  end
+	  set $fle_bi = $fle_bi + 1
+	end
+end
+
+# A slow O(n) search for a particular lazy lock in a genlk domain. This can be
+# EXTREMELY slow when lots of lazy locks are present (20 minutes+), and the
+# find_lock_entry function should probably be used instead.
+
+define find_lazy_lock
+	set $fll_genlk = $arg0
+	set $fll_resource = $arg1
+	set $fll_lock_entry = $fll_genlk->local->lazy_locks->tqh_first
+	while ($fll_lock_entry != 0)
+	  # printf "resource = %llu\n", $fll_lock_entry->resource
+	  if ($fll_lock_entry->resource == $fll_resource)
+	    output $fll_lock_entry
+	    printf "\n"
+	  end
+	  set $fll_lock_entry = $fll_lock_entry->lazy_queue_link->tqe_next
+	end
+end
+
+##################################
+# Function: get_page_size        #
+##################################
+
+define get_page_size
+	# XXX find from the kernel somehow
+	set $global_page_size = 8192
+end
+
+##################################
+# Function: gdb_memcmp           #
+##################################
+
+define gdb_memcmp
+	set $gdbm_p1 = (const uint8_t *) $arg0
+	set $gdbm_p2 = (const uint8_t *) $arg1
+	set $gdbm_pos = 0
+	set $gdbm_len = $arg2
+	set $gdbm_ret = 0
+
+	while !$gdbm_ret && $gdbm_len > $gdbm_pos
+		if $gdbm_p1[$gdbm_pos] != $gdbm_p2[$gdbm_pos]
+			if $gdbm_p1[$gdbm_pos] > $gdbm_p2[$gdbm_pos]
+				set $gdbm_ret = 1
+			else
+				set $gdbm_ret = -1
+			end
+		end
+
+		set $gdbm_pos = $gdbm_pos + 1
+	end
+end
+
+##################################
+# Function: hash_find_entry      #
+##################################
+#
+# Returns pointer to matching hash element
+#
+# Arguments:
+# arg0 - pointer to hash
+# arg1 - pointer to key to match
+
+define hash_set_bucket_entry
+	if $hfe_hash->num_buckets >= 2 * $hfe_buckets_per_page
+		set $hfe_chain = &$hfe_hash->storage.pages[$hfe_bucket/$hfe_buckets_per_page][$hfe_bucket & ($hfe_buckets_per_page - 1)]
+	else
+		set $hfe_chain = &$hfe_hash->storage.chains[$hfe_bucket]
+	end
+
+	set $hfe_entry = $hfe_chain->slh_first
+
+	if $hfe_entry
+		set $hfe_entry_key = (const uint8_t *) $hfe_entry + $hfe_hash->key_offset
+	end
+end
+
+define hash_iter_init
+	set $hfe_hash = $arg0
+
+	get_page_size
+	set $hfe_buckets_per_page = $global_page_size / sizeof(struct isi_hash_chain)
+	set $hfe_bucket = 0
+
+	hash_set_bucket_entry
+	if !$hfe_entry
+		hash_iter_next
+	end
+end
+
+define hash_iter_next
+	if $hfe_entry
+		set $hfe_entry = $hfe_entry->bucket_link.sle_next
+		if $hfe_entry
+			set $hfe_entry_key = (const uint8_t *) $hfe_entry + $hfe_hash->key_offset
+		end
+	end
+	while !$hfe_entry && $hfe_bucket < $hfe_hash->num_buckets
+		set $hfe_bucket = $hfe_bucket + 1
+		if $hfe_bucket < $hfe_hash->num_buckets
+			hash_set_bucket_entry
+		end
+	end
+end
+
+define hash_find_entry
+	set $hfe_key = $arg1
+	set $hfe_ret = (void *) 0
+
+	hash_iter_init $arg0
+
+	while $hfe_entry && !$hfe_ret
+		gdb_memcmp $hfe_key $hfe_entry_key $hfe_hash->key_size
+		if $gdbm_ret == 0
+			set $hfe_ret = $hfe_entry
+		end
+		hash_iter_next
+	end
+end
+
+
+##################################
+# Function: mds_cache_find_entry #
+##################################
+#
+# Prints a cached MDS entry (basically a fake vnode used to cache MDS block
+# contents). When multiple mirrors are present, the lowest baddr is always
+# used for caching.
+#
+# This does a linear search instead of computing the hash, so it might be kind
+# of slow on big clusters, since it runs in O(number of drives in the cluster)
+# 
+# Arguments:
+# arg0 - devid of lowest baddr
+# arg1 - drive of lowest baddr
+
+define mds_cache_find_entry
+	set $mcfe_devid = $arg0
+	set $mcfe_drive = $arg1
+
+	hash_iter_init &g_mds_cache->vnodes
+
+	set $mcfe_vnode_entry = (void *) 0
+	while $hfe_entry && !$mcfe_vnode_entry
+		set $mcfe_entry_key = (struct mds_cache_key *) $hfe_entry_key
+		if $mcfe_entry_key->devid == $mcfe_devid && $mcfe_entry_key->drive == $mcfe_drive
+			# The off_t cast is an offsetof implementation
+			set $mcfe_vnode_entry = (struct mds_cache_vnode *)((const uint8_t *) $hfe_entry - (off_t) &((struct mds_cache_vnode *) 0)->he)
+			print *$mcfe_vnode_entry
+		end
+		hash_iter_next
+	end
+end
+
+define mds_cache_find_buf
+	set $mcfe_baddr = $arg0
+
+	mds_cache_find_entry $mcfe_baddr->devid $mcfe_baddr->drive
+
+	set $mcfe_baddr_bits = ((uint64_t) $mcfe_baddr->_bits1 << 8) | $mcfe_baddr->_bits2
+	set $mcfe_baddr_size_mask = 1ULL << (7 >> ($mcfe_baddr_bits & 1)) - 1
+	set $mcfe_baddr_offset = ($mcfe_baddr_bits & ~$mcfe_baddr_size_mask) << (6 - 1)
+	set $mcfe_baddr_cacheidx = $mcfe_baddr_offset >> 13
+
+	findbuf_in_lists $mcfe_vnode_entry->vnode $mcfe_baddr_cacheidx
+end
+
+################################
+# Function: print_buf_contents #
+################################
+#
+# Prints the contents of a buf in hex, without any breaks. Can be used with a
+# simple script to write out the contents as binary to a file, useful for
+# examining contents of a modified in-memory buf with CPR for example.
+#
+define print_buf_contents
+	set $pbc_bp = $arg0
+	set $pbc_i = 0
+	printf "\n"
+	while ($pbc_i < $pbc_bp->b_bcount)
+	  printf "%02x", (unsigned char) $pbc_bp->b_data[$pbc_i]
+	  set $pbc_i = $pbc_i + 1
+	end
+end
+
+#
+# Helper function for print_gi_graph
+#
+define print_diskless_nodes
+	set $pdn_group = $arg0
+	set $pdn_map = &$pdn_group->diskless_nodes
+	set $pdn_i = 0
+	while ($pdn_i < $pdn_map->_used)
+		set $pdn_elem = &$pdn_map->_elements[$pdn_i]
+		set $pdn_devid = $pdn_elem->key
+		set $pdn_node = &$pdn_elem->value
+		printf "NODE_%d", $pdn_devid
+		if ($pdn_node->state == GMP_DISKLESS_NODE_UP)
+			printf "[color=green, style=filled, label=\""
+			printf "NODE %d (diskless)\\nstate=UP\"];\n", $pdn_devid
+		end
+		if ($pdn_node->state == GMP_DISKLESS_NODE_DOWN)
+			printf "[color=red, style=filled, label=\""
+			printf "NODE %d (diskless)\\nstate=DOWN\"];\n", $pdn_devid
+		end
+		printf "GMP_GROUP -> NODE_%d;\n", $pdn_devid
+		set $pdn_i = $pdn_i + 1
+	end
+end
+
+#
+# Helper function for print_gi_graph
+#
+define print_node_drive
+	set $pnd_devid = $arg0
+	set $pnd_ldnum = $arg1
+	set $pnd_drive = $arg2
+	# printf "printing drive <%d,%d>", $psn_devid, $psn_d
+	# printf "printing drive <%d,%d>", $pnd_devid, $pnd_ldnum
+	printf "DRIVE_%d_%d", $pnd_devid, $pnd_ldnum
+	if ($pnd_drive->state == GMP_DRIVE_DOWN || $pnd_drive->state == GMP_DRIVE_DEAD)
+		printf "[color=red, "
+	end
+	if ($pnd_drive->state == GMP_DRIVE_STALLED)
+		printf "[color=yellow, "
+	end
+	if ($pnd_drive->state == GMP_DRIVE_UP)
+		if ($pnd_drive->soft_failed != 0)
+			printf "[color=orange, "
+		end
+		if ($pnd_drive->soft_failed == 0)
+			printf "[color=green, "
+		end
+	end
+	printf "style=filled,label=\"DRIVE <%d,%d>\\n", $pnd_devid, $pnd_ldnum
+	if ($pnd_drive->state == GMP_DRIVE_DOWN)
+		printf "state=DOWN"
+	end
+	if ($pnd_drive->state == GMP_DRIVE_DEAD)
+		printf "state=DEAD"
+	end
+	if ($pnd_drive->state == GMP_DRIVE_STALLED)
+		printf "state=STALLED"
+	end
+	if ($pnd_drive->state == GMP_DRIVE_UP)
+		printf "state=UP"
+	end
+	if ($pnd_drive->soft_failed != 0)
+		printf ",SF"
+	end
+	if ($pnd_drive->soft_failed == 0)
+		printf ",NSF"
+	end
+	printf "\"];\n"
+	printf "NODE_%d -> DRIVE_%d_%d;\n", $pnd_devid, $pnd_devid, $pnd_ldnum
+end
+
+#
+# Helper function for print_gi_graph
+#
+define print_storage_node
+	set $psn_devid = $arg0
+	set $psn_node = $arg1
+	printf "NODE_%d", $psn_devid
+	if ($psn_node->state != GMP_STORAGE_NODE_UP)
+		printf "[color=red, "
+	end
+	if ($psn_node->state == GMP_STORAGE_NODE_UP)
+		if ($psn_node->soft_failed || $psn_node->read_only)
+			printf "[color=orange, "
+		end
+		if (!$psn_node->soft_failed && !$psn_node->read_only)
+			printf "[color=green, "
+		end
+	end
+	printf "style=filled, label=\"NODE %d (storage)\\n", $psn_devid
+	if ($psn_node->state == GMP_STORAGE_NODE_UP)
+		printf "state=UP"
+	end
+	if ($psn_node->state == GMP_STORAGE_NODE_DOWN)
+		printf "state=DOWN"
+	end
+	if ($psn_node->state == GMP_STORAGE_NODE_DEAD)
+		printf "state=DEAD"
+	end
+	if ($psn_node->soft_failed != 0)
+		printf ",SF"
+	end
+	if ($psn_node->soft_failed == 0)
+		printf ",NSF"
+	end
+	if ($psn_node->read_only != 0)
+		printf ",RO"
+	end
+	if ($psn_node->read_only == 0)
+		printf ",NRO"
+	end
+	printf "\"];\n"
+	printf "GMP_GROUP -> NODE_%d;\n", $psn_devid
+	set $psn_di = 0
+	set $psn_drives = &$psn_node->drives
+	while ($psn_di < $psn_drives->_used)
+		set $psn_delem = &$psn_drives->_elements[$psn_di]
+		set $psn_ldnum = $psn_delem->key
+		set $psn_drive = &$psn_delem->value
+		# printf "printing drive <%d,%d>", $psn_devid, $psn_ldnum
+		print_node_drive $psn_devid $psn_ldnum $psn_drive
+		set $psn_di = $psn_di + 1
+	end
+end
+
+#
+# Helper function for print_gi_graph
+#
+define print_storage_nodes
+	set $psns_group = $arg0
+	set $psns_map = &$psns_group->storage_nodes
+	set $psns_i = 0
+	while ($psns_i < $psns_map->_used)
+		#printf "printing storage node number %d", $psns_i
+		set $psns_elem = &$psns_map->_elements[$psns_i]
+		set $psns_devid = $psns_elem->key
+		set $psns_node = &$psns_elem->value
+		print_storage_node $psns_devid $psns_node
+		set $psns_i = $psns_i + 1
+	end
+end
+
+
+#
+# Helper function for print_gi_graph
+#
+define print_group_node
+	set $pgn_group = $arg0
+	printf "GMP_GROUP[color=green,style=filled,label=\""
+	printf "<%d,%d>\"];\n", $pgn_group->id.devid, $pgn_group->id.serial
+end
+
+############################
+# Function: print_gi_graph #
+############################
+#
+# Prints a visualization of a gmp_info as dotty graph. Can be useful for quickly
+# assessing the state of a GMP group from the debugger. Not really well-tested,
+# and may be buggy / broken.
+#
+define print_gi_graph
+	set $pgg_gi = $arg0
+	set $pgg_group = &$pgg_gi->group
+	printf "digraph gmp_group {\n"
+	print_group_node $pgg_group
+	print_storage_nodes $pgg_group
+	print_diskless_nodes $pgg_group
+	printf "}\n"
+end
+
+#################################
+# Function: get_fec_matrix_elem #
+#################################
+#
+# Utility function for BSW debugging.
+#
+# Arguments:
+# arg0 - pointer to a struct safe_layout_matrix
+#        or safe_layout_info after HABANERO_VERSION
+#   (typically swip->old_layout->matrix or swip->new_layout->matrix)
+# arg1 - logical cluster offset
+# arg2 - index of fec variant
+#
+# Prints the address of struct safe_cluster_info associated with the FEC cluster
+#
+define get_fec_matrix_elem
+        set $gfme_matrix = $arg0
+        set $gfme_lco = $arg1
+        set $gfme_variant = $arg2
+        set $gfme_index = ($gfme_matrix->fec_variants * $gfme_lco) + $gfme_variant
+
+        init-if-undefined $TARGET_VERSION = osrevision
+        if ($TARGET_VERSION < $HABANERO_VERSION)
+             set $gfme_elem = $gfme_matrix->fec[$gfme_index]
+        else
+             set $gfme_elem = $gfme_matrix->f_elem[$gfme_index]
+        end
+        printf "(struct safe_cluster_info *) %p\n", (void *) $gfme_elem
+end
+
+#################################
+# Function: get_data_matrix_elem#
+#################################
+#
+# Utility function for BSW debugging.
+#
+# Arguments:
+# arg0 - pointer to a struct safe_layout_matrix
+#        or safe_layout_info after HABANERO_VERSION
+#   (typically swip->old_layout->matrix or swip->new_layout->matrix)
+# arg1 - logical cluster offset
+# arg2 - mirror index
+#
+# Prints the address of struct safe_cluster_info associated with the data cluster
+#
+define get_data_matrix_elem
+        set $gdme_matrix = $arg0
+        set $gdme_lco = $arg1
+        set $gdme_midx = $arg2
+        set $gdme_index = ($gdme_matrix->data_mirrors * $gdme_lco) + $gdme_midx
+
+        init-if-undefined $TARGET_VERSION = osrevision
+        if ($TARGET_VERSION < $HABANERO_VERSION)
+             set $gdme_elem = $gfme_matrix->data[$gfme_index]
+        else
+             set $gdme_elem = $gdme_matrix->d_elem[$gdme_index]
+        end
+	printf "(struct safe_cluster_info *) %p\n", (void *) $gdme_elem
+end
+
+#
+# Helper for print_cmds_graph
+#
+define print_cmd_name
+	set $pcn_cmd = $arg0
+	if ($pcn_cmd->sw_cmd == WC_ABORT)
+	  printf "ABORT"
+	end
+	if ($pcn_cmd->sw_cmd == WC_ALLOC)
+	  printf "ALLOC"
+	end
+	if ($pcn_cmd->sw_cmd == WC_FEC)
+	  printf "FEC"
+	end
+	if ($pcn_cmd->sw_cmd == WC_READ)
+	  printf "READ"
+	end
+	if ($pcn_cmd->sw_cmd == WC_RECONSTRUCT)
+	  printf "RECONSTRUCT"
+	end
+	if ($pcn_cmd->sw_cmd == WC_SETBLKADDRS)
+	  printf "SETBLKADDRS"
+	end
+	if ($pcn_cmd->sw_cmd == WC_SET_WIDTH_DEVICES)
+	  printf "SET_WIDTH_DEVICES"
+	end
+	if ($pcn_cmd->sw_cmd == WC_UIOMOVE)
+	  printf "UIOMOVE"
+	end
+	if ($pcn_cmd->sw_cmd == WC_WRITE)
+	  printf "WRITE"
+	end
+	if ($pcn_cmd->sw_cmd == WC_WRITE_UIO_ZERO)
+	  printf "WRITE_UIO_ZERO"
+	end
+	if ($pcn_cmd->sw_cmd == WC_ZERO_READ)
+	  printf "ZERO_READ"
+	end
+
+	init-if-undefined $TARGET_VERSION = osrevision
+	if ($TARGET_VERSION >= $HABANERO_VERSION)
+	  if ($pcn_cmd->sw_cmd == WC_WRITE_ZERO)
+	    printf "WRITE_ZERO"
+	  end
+	else
+	  if ($pcn_cmd->sw_cmd == WC_L2_PREFETCH)
+	    printf "L2_PREFETCH"
+	  end
+	  if ($pcn_cmd->sw_cmd == WC_IFM_FLUSH_OP)
+	    printf "IFM_FLUSH_OP"
+	  end
+	  if ($pcn_cmd->sw_cmd == WC_WRITE_UIO)
+	    printf "WRITE_UIO"
+	  end
+	  if ($pcn_cmd->sw_cmd == WC_XFER)
+	    printf "XFER"
+	  end
+	end
+end
+
+
+#
+# Helper for print_cmds_graph
+#
+
+define print_cmd_waiter_pre_habanero
+	set $pcw_cmd = $arg0
+	set $pcw_i = 0
+
+	while ($pcw_i != $pcw_cmd->sw_waiters->_used)
+	  set $pcw_cmd2 = $pcw_cmd->sw_waiters->cmds[$pcw_i]
+	  printf "\""
+	  print_cmd_name $pcw_cmd2
+	  printf " (%p)\" -> \"", $pcw_cmd2
+	  print_cmd_name $pcw_cmd
+	  printf " (%p)\";\n", $pcw_cmd
+	  set $pcw_i = $pcw_i + 1
+	end
+end
+
+define print_cmd_waiter_post_habanero
+	set $pcw_cmd = $arg0
+	set $pcw_i = 0
+
+	if ($pcw_i != $pcw_cmd->sw_waiters->_v[0].v_used)
+	  set $pcw_cmd2 = (struct safe_write_cmd *) ((struct dependency *) $pcw_cmd->sw_waiters->dependencies)[$pcw_i]->dep_waiter
+	  printf "\""
+	  print_cmd_name $pcw_cmd2
+	  printf " (%p)\" -> \"", $pcw_cmd2
+	  print_cmd_name $pcw_cmd
+	  printf " (%p)\";\n", $pcw_cmd
+	  set $pcw_i = $pcw_i + 1
+	end
+end
+
+define print_cmd_waiters
+	init-if-undefined $TARGET_VERSION = osrevision
+	if ($TARGET_VERSION < $HABANERO_VERSION)
+	  print_cmd_waiter_pre_habanero $arg0
+	else
+	  print_cmd_waiter_post_habanero $arg0
+	end
+end
+
+#
+# Helper for print_cmds_graph
+#
+
+define print_baddr_pre_habanero
+	set $pb_addr = (struct ifs_addr*)$arg0
+	printf "%d,", $pb_addr->devid
+	printf "%d,", $pb_addr->drive
+
+	set $pb_bits = ($pb_addr->bits1 << 8) | $pb_addr->bits2
+	set $pb_size = 512
+	if ($pb_addr->bits2 == 0)
+	  set $pb_size = 8192
+	end
+	set $pb_bits = $pb_bits & (~(((u_int64_t)$pb_size - 1) >> 6))
+	set $pb_offset = (u_int64_t)($pb_bits << 5)
+	printf "%llu:", $pb_offset
+	printf "%d", $pb_size
+end
+
+define print_baddr_post_habanero
+	set $pb_addr = (struct ifs_baddr*)$arg0
+	printf "%d,", $pb_addr->devid
+	printf "%d,", $pb_addr->drive
+end
+
+define print_baddr
+	init-if-undefined $TARGET_VERSION = osrevision
+	if ($TARGET_VERSION >= $HABANERO_VERSION)
+		print_baddr_post_habanero $arg0
+	else
+		print_baddr_pre_habanero $arg0
+	end
+end
+
+define print_flags_field
+	init-if-undefined $TARGET_VERSION = osrevision
+	if ($TARGET_VERSION < $HABANERO_VERSION)
+	  printf " 0x%lx", $arg0->flags
+	end
+end
+
+define print_cacheidx_field
+	init-if-undefined $TARGET_VERSION = osrevision
+	if ($TARGET_VERSION < $HABANERO_VERSION)
+	  printf ",\\ncacheidx=0x%lx", $arg0.cacheidx
+	else
+	  printf ",\\ncacheidx=0x%lx", $arg0.cacheidx->r
+	end
+end
+
+define print_promoted_field
+	init-if-undefined $TARGET_VERSION = osrevision
+	if ($TARGET_VERSION < $HABANERO_VERSION)
+	  if ($arg0.promoted_from_zero_read == 1)
+	    printf ", promoted"
+	  end
+	else
+	  if ($arg0.debug_promoted_from_zero_read == 1)
+	    printf ", promoted"
+	  end
+	end
+end
+
+#
+# Helper for print_cmds_graph
+#
+define print_cmd_decl
+	set $pcd_cmd = $arg0
+	set $pcd_state = $arg1
+	set $pcd_swip = $pcd_cmd->sw_swip
+	printf "\""
+	print_cmd_name $pcd_cmd
+	printf " (%p)\"", $pcd_cmd
+	# waiting
+	if ($pcd_state == 0)
+	  printf "[color=yellow,style=filled,label=\""
+	end
+	# runnable
+	if ($pcd_state == 1)
+	  printf "[color=blue,style=filled,label=\""
+	end
+	# running
+	if ($pcd_state == 2)
+	  printf "[color=green,style=filled,label=\""
+	end
+	# done
+	if ($pcd_state == 3)
+	  printf "[color=purple,style=filled,label=\""
+	end
+	print_cmd_name $pcd_cmd
+	printf " {%p}:\\n", $pcd_cmd
+	if ($pcd_cmd->sw_cmd == WC_ABORT)
+	  printf "error=%d", $pcd_cmd->sw_cmds.sw_abort_cmd.error
+	end
+
+	if ($pcd_cmd->sw_cmd == WC_ALLOC)
+	  printf "node=%d,", $pcd_cmd->sw_cmds.sw_alloc_cmd.dd.dd_devid
+	  printf "drive=%d,", $pcd_cmd->sw_cmds.sw_alloc_cmd.dd.dd_ldnum
+	  printf "blocks=%u", $pcd_cmd->sw_cmds.sw_alloc_cmd.blocks->_v->v_used
+	end
+
+	if ($pcd_cmd->sw_cmd == WC_FEC)
+	  printf "off=%d, ", $pcd_cmd->sw_cmds.sw_fec_cmd.offset
+	  printf "first_lbn=%d, ", $pcd_cmd->sw_cmds.sw_fec_cmd.pg->first_lbn
+	  printf "prot="
+          set $pcd_prot = $pcd_cmd->sw_cmds.sw_fec_cmd.pg->prot
+	  if ($pcd_prot.type == PROTECTION_TYPE_FEC)
+	    printf "%d+", $pcd_prot.n
+	    printf "%d", $pcd_prot.m
+            if $pcd_prot.b > 1
+              printf "/%d", $pcd_prot.b
+            end
+	  end
+	  if ($pcd_prot.type == PROTECTION_TYPE_MIRRORING)
+	    printf "%dx", $pcd_prot.n
+	  end
+	  printf "\\ngenerate=%d", $pcd_cmd->sw_cmds.sw_fec_cmd.generate
+	end
+
+	if ($pcd_cmd->sw_cmd == WC_READ)
+	  set $pcd_baddr = & ($pcd_cmd->sw_cmds.sw_read_cmd.sbip_sourceaddr->baddr)
+	  print_baddr $pcd_baddr
+	  print_cacheidx_field $pcd_cmd->sw_cmds.sw_read_cmd
+	  print_promoted_field $pcd_cmd->sw_cmds.sw_read_cmd
+	end
+
+	if ($pcd_cmd->sw_cmd == WC_RECONSTRUCT)
+	  set $pcd_i = 0
+	  while ($pcd_i < $pcd_cmd->sw_cmds.sw_reconstruct_cmd.count)
+	    printf "lco=%d ", $pcd_cmd->sw_cmds.sw_reconstruct_cmd.blocks[$pcd_i].lco
+	    set $pcd_i = $pcd_i + 1
+	  end
+	end
+
+	if ($pcd_cmd->sw_cmd == WC_UIOMOVE)
+	  printf "lbo=%d.", $pcd_cmd->sw_cmds.sw_uiomove_cmd.lbo
+	  printf "%d\\n", $pcd_cmd->sw_cmds.sw_uiomove_cmd.sbip_storage->lbn
+	  set $pcd_baddr = & ($pcd_cmd->sw_cmds.sw_uiomove_cmd.sbip_storage->baddr)
+	  print_baddr $pcd_baddr
+	  print_flags_field $pcd_cmd->sw_cmds.sw_uiomove_cmd.sbip_storage
+	end
+
+	if ($pcd_cmd->sw_cmd == WC_WRITE)
+	  if ($pcd_cmd->sw_cmds.sw_write_cmd.sbip_destaddr->baddr.devid != 0)
+	    printf "s: "
+	    set $pcd_baddr = & ($pcd_cmd->sw_cmds.sw_write_cmd.sbip_storage->baddr)
+	    print_baddr $pcd_baddr
+	    print_flags_field $pcd_cmd->sw_cmds.sw_write_cmd.sbip_storage
+	    printf "\\nd: "
+	    set $pcd_baddr = & ($pcd_cmd->sw_cmds.sw_write_cmd.sbip_destaddr->baddr)
+	    print_baddr $pcd_baddr
+	    print_flags_field $pcd_cmd->sw_cmds.sw_write_cmd.sbip_destaddr
+	  end
+	end
+
+
+	if ($pcd_cmd->sw_cmd == WC_WRITE_UIO_ZERO)
+	  printf "lbn=0x%lx", $pcd_cmd->sw_cmds.sw_write_uio_cmd.lbn
+	  if ($pcd_cmd->sw_cmds.sw_write_uio_cmd.sbip_destaddr->baddr.devid != 0)
+	    printf "\\n"
+	    set $pcd_baddr = & ($pcd_cmd->sw_cmds.sw_write_uio_cmd.sbip_destaddr->baddr)
+	    print_baddr $pcd_baddr
+	  end
+	end
+
+	if ($pcd_cmd->sw_cmd == WC_ZERO_READ)
+	  set $pcd_baddr = & ($pcd_cmd->sw_cmds.sw_read_cmd.sbip_sourceaddr->baddr)
+	  printf "baddr="
+	  print_baddr $pcd_baddr
+	  printf "cacheidx=0x%lx", $pcd_cmd->sw_cmds.sw_read_cmd.cacheidx.r
+	end
+
+	init-if-undefined $TARGET_VERSION = osrevision
+	if ($TARGET_VERSION < $HABANERO_VERSION)
+	  if ($pcd_cmd->sw_cmd == WC_WRITE_UIO)
+	    printf "lbn=0x%lx", $pcd_cmd->sw_cmds.sw_write_uio_cmd.lbn
+	    if ($pcd_cmd->sw_cmds.sw_write_uio_cmd.sbip_destaddr->baddr.devid != 0)
+	      printf "\\n"
+	      set $pcd_baddr = & ($pcd_cmd->sw_cmds.sw_write_uio_cmd.sbip_destaddr->baddr)
+	      print_baddr $pcd_baddr
+	      print_flags_field $pcd_cmd->sw_cmds.sw_write_cmd.sbip_destaddr
+	    end
+	  end
+
+	  if ($pcd_cmd->sw_cmd == WC_XFER)
+	    printf "s: "
+	    set $pcd_baddr = & ($pcd_cmd->sw_cmds.sw_xfer_cmd.sbip_storage->baddr)
+	    print_baddr $pcd_baddr
+	    printf "\\nd: "
+	    set $pcd_baddr = & ($pcd_cmd->sw_cmds.sw_xfer_cmd.sbip_destaddr->baddr)
+	    print_baddr $pcd_baddr
+	  end
+	end
+
+	printf "\\nstate="
+	if ($pcd_state == 0)
+	  printf "WAITING"
+	end
+	if ($pcd_state == 1)
+	  printf "RUNNABLE"
+	end
+	if ($pcd_state == 2)
+	  printf "RUNNING"
+	end
+	if ($pcd_state == 3)
+	  printf "DONE"
+	end
+
+	if ($TARGET_VERSION < $HABANERO_VERSION)
+	  if ($pcd_swip->expensive_checks)
+	    printf ", sw_number=%d", $pcd_cmd->sw_number
+	  end
+	end
+	printf "\"];\n"
+end
+
+##############################
+# Function: print_cmds_graph #
+##############################
+#
+# Awesome utility function for BSW debugging. This one takes a pointer to a
+# struct safe_write_cmds (typically swip->cmds or swip->snap_cmds) and prints
+# the entire commands graph in dotty format. Copy/paste into a .dot file and
+# run dotty to get a visualization of the safe write graph. Output is in the
+# same format as sysctl efs.bam.dump_last_write_plan.
+#
+# Arguments:
+# arg0 - pointer to a struct safe_write_cmds (swip->cmds or swip->snap_cmds)
+#
+
+define print_cmds_graph
+	set $pcg_cmds = $arg0
+	set $pcg_state = 0
+	printf "digraph new_write {\n"
+	set $pcg_cmd = $pcg_cmds->swc_waiting->tqh_first
+	while ($pcg_cmd != 0)
+	  print_cmd_decl $pcg_cmd $pcg_state
+	  print_cmd_waiters $pcd_cmd
+	  set $pcg_cmd = $pcg_cmd->next.tqe_next
+	end
+
+	set $pcg_state = 1
+
+	init-if-undefined $TARGET_VERSION = osrevision
+	if ($TARGET_VERSION < $HABANERO_VERSION)
+	  set $pcg_pri = 0
+	  while ($pcg_pri < NUM_ENG_PRIORITIES)
+	    set $pcg_cmd = $pcg_cmds->swc_runnable[$pcg_pri]->tqh_first
+	    while ($pcg_cmd != 0)
+	      print_cmd_decl $pcg_cmd $pcg_state
+	      print_cmd_waiters $pcd_cmd
+	      set $pcg_cmd = $pcg_cmd->next.tqe_next
+	    end
+	    set $pcg_pri = $pcg_pri + 1
+	  end
+	else
+	  set $pcg_cmd = $pcg_cmds->swc_runnable->tqh_first
+	    while ($pcg_cmd != 0)
+	      print_cmd_decl $pcg_cmd $pcg_state
+	      print_cmd_waiters $pcd_cmd
+	      set $pcg_cmd = $pcg_cmd->next.tqe_next
+	  end
+	end
+
+	set $pcg_state = 2
+	set $pcg_cmd = $pcg_cmds->swc_running->tqh_first
+	while ($pcg_cmd != 0)
+	  print_cmd_decl $pcg_cmd $pcg_state
+	  print_cmd_waiters $pcd_cmd
+	  set $pcg_cmd = $pcg_cmd->next.tqe_next
+	end
+	set $pcg_state = 3
+	set $pcg_cmd = $pcg_cmds->swc_done->tqh_first
+	while ($pcg_cmd != 0)
+	  print_cmd_decl $pcg_cmd $pcg_state
+	  print_cmd_waiters $pcd_cmd
+	  set $pcg_cmd = $pcg_cmd->next.tqe_next
+	end
+	printf "}\n"
+end
+
+##################################
+# Function: print_safe_write_cmd #
+##################################
+#
+# Utility function for BSW debugging
+#
+# Prints a struct safe_write_cmd in an easily-readable format
+#
+define print_safe_write_cmd
+	set $pswc_cmd = $arg0
+	printf "struct safe_write_cmd @ %p = ", (void*)$arg0
+
+	init-if-undefined $TARGET_VERSION = osrevision
+	if ($TARGET_VERSION < $HABANERO_VERSION)
+	  printf "{\n  sw_priority = "
+	  output $pswc_cmd->sw_priority
+	end
+	printf ",\n  sw_cmd = "
+	output $pswc_cmd->sw_cmd
+	printf ",\n  sw_wait_count = "
+	output $pswc_cmd->sw_wait_count
+	printf ",\n  sw_swip = "
+	output $pswc_cmd->sw_swip
+	if ($pswc_cmd->sw_cmd == WC_ABORT)
+	  print_sw_abort_cmd $pswc_cmd
+	end
+	if ($pswc_cmd->sw_cmd == WC_ALLOC)
+	  print_sw_alloc_cmd $pswc_cmd
+	end
+	if ($pswc_cmd->sw_cmd == WC_FEC)
+	  print_sw_fec_cmd $pswc_cmd
+	end
+
+	if ($pswc_cmd->sw_cmd == WC_READ)
+	  print_sw_read_cmd $pswc_cmd
+	end
+	if ($pswc_cmd->sw_cmd == WC_RECONSTRUCT)
+	  print_sw_reconstruct_cmd $pswc_cmd
+	end
+
+	if ($pswc_cmd->sw_cmd == WC_WRITE)
+	  print_sw_write_cmd $pswc_cmd
+	end
+	if ($pswc_cmd->sw_cmd == WC_UIOMOVE)
+	  print_sw_uiomove_cmd $pswc_cmd
+	end
+	if ($pswc_cmd->sw_cmd == WC_WRITE_UIO_ZERO)
+	  print_sw_write_uio_zero_cmd $pswc_cmd
+	end
+
+	if ($TARGET_VERSION >= $HABANERO_VERSION)
+	  if ($pswc_cmd->sw_cmd == WC_WRITE_ZERO)
+	    printf "WRITE_ZERO"
+	  end
+	else
+	  if ($pswc_cmd->sw_cmd == WC_SETBLKADDRS)
+	    print_sw_setblkaddrs_cmd $pswc_cmd
+	  end
+	  if ($pswc_cmd->sw_cmd == WC_SET_WIDTH_DEVICES)
+	    print_sw_set_width_devices_cmd $pswc_cmd
+	  end
+	  if ($pswc_cmd->sw_cmd == WC_L2_PREFETCH)
+	    print_sw_l2_prefetch_cmd $pswc_cmd
+	  end
+	  if ($pswc_cmd->sw_cmd == WC_IFM_FLUSH_OP)
+	    print_sw_ifm_flush_op_cmd $pswc_cmd
+	  end
+	  if ($pswc_cmd->sw_cmd == WC_WRITE_UIO)
+	    print_sw_write_uio_cmd $pswc_cmd
+	  end
+	  if ($pswc_cmd->sw_cmd == WC_XFER)
+	    print_sw_xfer_cmd $pswc_cmd
+	  end
+	end
+
+	if ($pswc_cmd->sw_cmd == WC_ZERO_READ)
+	  print_sw_zero_read_cmd $pswc_cmd
+	end
+
+	printf ",\n  sw_waiters = "
+	output $pswc_cmd->sw_waiters
+	printf ",\n  next = "
+	output $pswc_cmd->next
+	if ($TARGET_VERSION < $HABANERO_VERSION)
+	  printf ",\n  head = "
+	  output $pswc_cmd->head
+	end
+	printf "\n}\n"
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_ABORT command
+#
+define print_sw_abort_cmd
+	set $sw_abort_cmd = $arg0
+	printf ",\n  sw_cmds.sw_abort_cmd = "
+	output $sw_abort_cmd->sw_cmds.sw_abort_cmd
+end
+
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_ALLOC command
+#
+define print_sw_alloc_cmd
+	set $sw_alloc_cmd = $arg0
+	printf ",\n  sw_cmds.sw_alloc_cmd = "
+	output $sw_alloc_cmd->sw_cmds.sw_alloc_cmd
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_FEC command
+#
+define print_sw_fec_cmd
+	set $sw_fec_cmd = $arg0
+	printf ",\n  sw_cmds.sw_fec_cmd = "
+	output $sw_fec_cmd->sw_cmds.sw_fec_cmd
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_L2_PREFETCH command
+#
+define print_sw_l2_prefetch_cmd
+	set $sw_l2_prefetch_cmd = $arg0
+	printf ",\n  sw_cmds.sw_l2_prefetch_cmd = "
+	output $sw_l2_prefetch_cmd->sw_cmds.sw_l2_prefetch_cmd
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_READ command
+#
+define print_sw_read_cmd
+	set $sw_read_cmd = $arg0
+	printf ",\n  sw_cmds.sw_read_cmd = "
+	output $sw_read_cmd->sw_cmds.sw_read_cmd
+#	printf "\n\t\tsbip_sourceaddr = "
+#	output *$sw_read_cmd->sw_cmds.sw_read_cmd.sbip_sourceaddr
+#	printf ",\n\t\tsbip->storage = "
+#	output *$sw_read_cmd->sw_cmds.sw_read_cmd.sbip_storage
+#	printf ",\n\t\tsbip->oldstorage = "
+#	output *$sw_read_cmd->sw_cmds.sw_read_cmd.sbip_oldstorage
+#	printf ",\n\t\tcacheidx = %d", $sw_read_cmd->sw_cmds.sw_read_cmd.cacheidx
+#	printf ",\n\t\tslot = "
+#	output $sw_read_cmd->sw_cmds.sw_read_cmd.slot
+#	printf ",\n\t},"
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_RECONSTRUCT command
+#
+define print_sw_reconstruct_cmd
+	set $sw_reconstruct_cmd = $arg0
+	printf ",\n  sw_cmds.sw_reconstruct_cmd = "
+	output $sw_reconstruct_cmd->sw_cmds.sw_reconstruct_cmd
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_SETBLKADDRS command
+#
+define print_sw_setblkaddrs_cmd
+	set $sw_setblkaddrs_cmd = $arg0
+	printf ",\n  sw_cmds.sw_setblkaddrs_cmd = "
+	output $sw_setblkaddrs_cmd->sw_cmds.sw_setblkaddrs_cmd
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_SET_WIDTH_DEVICES command
+#
+define print_sw_set_width_devices_cmd
+	set $sw_set_width_devices_cmd = $arg0
+	printf ",\n  sw_cmds.sw_set_width_devices_cmd = "
+	output $sw_set_width_devices_cmd->sw_cmds.sw_set_width_devices_cmd
+end
+
+##
+## Helper function for print_safe_write_cmd, prints a WC_IFM_FLUSH_OP command
+##
+#define print_sw_ifm_flush_op_cmd
+#	set $sw__cmd = $arg0
+#	printf ",\n  sw_cmds.sw_ifm_cmd = "
+#	output $sw__cmd->sw_cmds.sw__cmd
+#end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_UIOMOVE command
+#
+define print_sw_uiomove_cmd
+	set $sw_uiomove_cmd = $arg0
+	printf ",\n  sw_cmds.sw_uiomove_cmd = "
+	output $sw_uiomove_cmd->sw_cmds.sw_uiomove_cmd
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_WRITE command
+#
+define print_sw_write_cmd
+	set $sw_write_cmd = $arg0
+	printf ",\n  sw_cmds.sw_write_cmd = "
+	output $sw_write_cmd->sw_cmds.sw_write_cmd
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_WRITE_UIO command
+#
+define print_sw_write_uio_cmd
+	set $sw_write_uio_cmd = $arg0
+	printf ",\n  sw_cmds.sw_write_uio_cmd = "
+	output $sw_write_uio_cmd->sw_cmds.sw_write_uio_cmd
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_WRITE_UIO_ZERO command
+#
+define print_sw_write_uio_zero_cmd
+	set $sw_write_uio_zero_cmd = $arg0
+	printf ",\n  sw_cmds.sw_write_uio_cmd = "
+	output $sw_write_uio_zero_cmd->sw_cmds.sw_write_uio_cmd
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_XFER command
+#
+define print_sw_xfer_cmd
+	set $sw_xfer_cmd = $arg0
+	printf ",\n  sw_cmds.sw_xfer_cmd = "
+	output $sw_xfer_cmd->sw_cmds.sw_xfer_cmd
+end
+
+#
+# Helper function for print_safe_write_cmd, prints a WC_ZERO_READ command
+#
+define print_sw_zero_read_cmd
+	set $sw_zero_read_cmd = $arg0
+	printf ",\n  sw_cmds.sw_read_cmd = "
+	output $sw_zero_read_cmd->sw_cmds.sw_read_cmd
+end
+
+#################################
+# Function: print_cmdqueue_head #
+#################################
+#
+# Utility function for BSW debugging
+#
+# Prints all safe write commands on a particular command queue in a safe write
+# plan
+#
+# Arguments:
+# arg0 - pointer to a struct cmdqueue_head, typically something like
+#   &swip->cmds->swc_done or &swip->cmds->swc_runnable[0]
+#
+define print_cmdqueue_head
+	set $pcqh_head = $arg0
+	set $pcqh_next = 0
+	if ($pcqh_head != 0)
+	  set $pcqh_next = $pcqh_head->tqh_first
+	end
+	while ($pcqh_next != 0)
+	  print_safe_write_cmd $pcqh_next
+	  set $pcqh_next = $pcqh_next->next.tqe_next
+	end
+end
+
+#######################
+# Function: dump_hash #
+#######################
+#
+# Utility function to dump a hash table
+#
+# Prints all hash table elements
+#
+# Arguments:
+# arg0	-	Pointer to the hash
+# arg1	-	Struct name of the things in the hash
+# arg2  -	Field name of the hash entry in the struct
+#
+define dump_slist_hash
+	set $buck=$arg0
+	set $nb=$arg1
+	set $cur=(($arg2)->slh_first)
+	set $off = (size_t)(&((struct $arg3 *)0)->$arg4)
+	set $n=1
+	if ($cur)
+		printf "bucket %d/%d:\n", $buck, $nb
+		while ($cur && $n < 30000)
+			printf "\t%d: ", $n
+			output $cur
+			printf ": "
+			output *((struct $arg3 *)((char *)$cur - $off))
+			printf "\n"
+			set $n=$n+1
+			set $cur=(($cur)->bucket_link.sle_next)
+		end
+	end
+end
+document dump_slist_hash
+	show a hash slist.  usage: dump_slist head field
+end
+
+define dump_hash
+	set $h = $arg0
+	set $num_buckets = $h->num_buckets
+	set $num_entries = $h->num_entries
+	set $page_size = vm_cnt.v_page_size
+	set $buckpp = $page_size / sizeof(struct isi_hash_chain)
+	set $i = 0
+	if ($num_buckets / $buckpp > 1)
+		while ($i < $num_buckets)
+			set $p = $i / $buckpp
+			set $off = $i % $buckpp
+
+			dump_slist_hash $i $num_buckets &($h->storage.pages[$p][$off]) $arg1 $arg2
+
+			set $i = $i + 1
+		end
+        else
+		while ($i < $num_buckets)
+
+			dump_slist_hash $i $num_buckets &($h->storage.chains[$i]) $arg1 $arg2
+
+			set $i = $i + 1
+		end
+        end
+end
+document dump_hash
+	show a hash.  usage: dump_hash hash struct_type struct_field
+end
+
+# Find a transaction given the transaction sequence in the node's journal
+# $arg0 = jd_trans_seq_t
+define journal_find_txn
+  set $jft_tr_seq = $arg0 
+  set $jft_journal = (struct journal *)((struct ifsmount *)efs_mp->mnt_data)->im_journal
+  set $jft_list = 0
+  set $jft_found = 0
+  while ($jft_list < TR_LIST_NUM && $jft_found == 0)
+    set $jft_anchor = $jft_journal->j_txns[$jft_list]
+    set $jft_iter = $jft_anchor.tqh_first
+    while ($jft_iter)
+      #print $jft_iter
+      if ($jft_iter->tr_seq.n == $jft_tr_seq.n)
+	printf "Found %p in list %d\n", $jft_iter, $jft_list
+	set $jft_found = 1
+	loop_break
+      end
+      set $jft_iter = $jft_iter.tr_link.tqe_next
+    end
+    set $jft_list += 1
+  end
+end
+
+# Print attributes inlined in the dinode
+# arg0: dinode pointer
+define print_dinode_attributes
+  set $pda_dip = $arg0
+  set $pda_start = (const char *)&$pda_dip->di_idi - $pda_dip->di_attr_bytes
+  set $pda_cursor = $pda_start
+  set $pda_end = $pda_start + $pda_dip->di_attr_bytes
+  set $pda_attr_size = 0
+
+  while ($pda_cursor < $pda_end)
+    set $pda_record = (struct ifm_attribute_record *)$pda_cursor
+    if ($pda_record->key > 0 && $pda_record->key <= INATTR_MAX)
+      set $pda_attr = &inattr_def_array[$pda_record->key]
+      if ($pda_attr->fixed_len > 0)
+	printf "key: %d, attr start: %p, attr size: %d\n", $pda_record->key, \
+          $pda_record->data, $pda_attr->fixed_len
+	set $pda_cursor += ($pda_attr->fixed_len + sizeof($pda_record->key))
+      else
+	printf "key: %d, attr start: %p, attr size: %d\n", $pda_record->key, \
+          $pda_record->len_data, $pda_record->len
+	set $pda_cursor += ($pda_record->len + sizeof(*$pda_record))
+      end
+    end
+  end
+end
+
+define print_all_baddrs_in_blkset
+  set $pabib_blkset = $arg0
+  set $pabib_set_i = 0
+  while ($pabib_set_i < $pabib_blkset->bs_num)
+    set $pabib_barp = $pabib_blkset->bs_barap[$pabib_set_i].br_barp
+    set $pabib_barp_i = 0
+    while ($pabib_barp_i < $pabib_blkset->bs_barap[$pabib_set_i].br_num)
+      print $pabib_barp[$pabib_barp_i]
+      set $pabib_barp_i += 1
+    end
+    set $pabib_set_i += 1
+  end
+end
+
+define find_proc_by_pid
+	set $pid = $arg0
+
+	set $proc = allproc->lh_first
+	while ($proc != 0)
+		if ($proc->p_pid == $pid)
+			printf "proc = %p", $proc
+			loop_break
+		end
+		set $proc = $proc->p_list.le_next
+	end
+end
+
+###########################################
+#    PSCHED STRIPTS                       #
+###########################################
+
+define test_bio_for_buf
+	set $tbfb_test   = $arg0
+	set $tbfb_target = $arg1
+	if ($tbfb_test->bio_data == $tbfb_target)
+		printf "bio(%p)->bio_data == target\n",	$tbfb_test
+		set $found = $found + 1
+	end
+	if ($tbfb_test->bio_caller1 == $tbfb_target)
+		printf "bio(%p)->bio_caller1 == target\n",	$tbfb_test
+		set $found = $found + 1
+	end
+	if ($tbfb_test->bio_caller2 == $tbfb_target)
+		printf "bio(%p)->bio_caller2 == target\n",	$tbfb_test
+		set $found = $found + 1
+	end
+	if ($tbfb_test->bio_unmap_bp == $tbfb_target)
+		printf "bio(%p)->bio_unmap_bp == target\n",	$tbfb_test
+		set $found = $found + 1
+	end
+	if ($tbfb_test->bio_track_bp == $tbfb_target)
+		printf "bio(%p)->bio_track_bp == target\n",	$tbfb_test
+		set $found = $found + 1
+	end
+end
+document test_bio_for_buf
+Internal support method used by find_buf_in_cam and find_buf_in_bioq
+end
+
+define find_buf_in_cam
+	set $disk = (struct disk *)$arg0
+	set $target = (struct bio*)$arg1
+	set $periph = (struct cam_periph *)$disk->d_drv1
+	set $softc  = (struct da_softc *)$periph->softc
+
+	printf "searching in cam pending_bios on drive %s\n",$disk->d_name
+	set $drv_test = $softc->pending_bios->tqh_first
+	while ($drv_test != 0)
+		set $test_bio = $drv_test
+		set $found = 0
+		while ($test_bio != 0)
+			test_bio_for_buf $test_bio $target
+			set $test_bio = $test_bio->bio_parent
+		end
+		if ($found > 0)
+			printf "Base bio in pending_bios: (struct bio *)%p\n",\
+				$drv_test
+		end
+		set $drv_test = $drv_test->bio_queue->tqe_next
+	end
+end
+document find_buf_in_cam
+Search CAM structures for a given buf
+end
+
+define find_bio_in_bioq
+	set $fbib_fbib_dp = (struct disk *)$arg0
+	set $fbib_fbib_offset = $arg1
+	set $target = (void *)$arg2
+	set $fbib_iip = $fbib_fbib_dp->d_iip
+
+	printf "Searching in prioq\n"
+	set $fbib_bio = $fbib_iip->prioq.tqh_first
+	while ($fbib_bio != 0)
+		set $test_bio = $fbib_bio
+		set $found = 0
+		while ($test_bio != 0)
+			test_bio_for_buf $test_bio $target
+			set $test_bio = $test_bio->bio_parent
+		end
+		if ($found > 0)
+			printf "Base bio in prioq: (struct bio *)%p\n",\
+				$fbib_bio
+		end
+		set $fbib_bio = $fbib_bio->bio_prioq_next.tqe_next
+	end
+
+	printf "Searching in diskq\n"
+	set $fbib_bio = $fbib_iip->diskq.tqh_first
+	while ($fbib_bio != 0)
+		set $test_bio = $fbib_bio
+		set $found = 0
+		while ($test_bio != 0)
+			test_bio_for_buf $test_bio $target
+			set $test_bio = $test_bio->bio_parent
+		end
+		if ($found > 0)
+			printf "Base bio in prioq: (struct bio *)%p\n",\
+				$fbib_bio
+		end
+		set $fbib_bio = $fbib_bio->bio_diskq_next.tqe_next
+	end
+
+	printf "Searching in deadlineq\n"
+	set $fbib_bio = $fbib_iip->deadlineq.tqh_first
+	while ($fbib_bio != 0)
+		set $test_bio = $fbib_bio
+		set $found = 0
+		while ($test_bio != 0)
+			test_bio_for_buf $test_bio $target
+			set $test_bio = $test_bio->bio_parent
+		end
+		if ($found > 0)
+			printf "Base bio in prioq: (struct bio *)%p\n",\
+				$fbib_bio
+		end
+		set $fbib_bio = $fbib_bio->bio_deadlineq_next.tqe_next
+	end
+end
+
+define find_buf
+	print "Not Impl.  Would need to find all disks"
+end
+document find_buf
+Looks in common structures to figure out where a given buffer might be
+referenced
+end
+
+define print_prioq_generations_age
+	set $ppga_iip = $arg0
+	set $ppga_bio = $ppga_iip->prioq.tqh_first
+	while ($ppga_bio != 0)
+		printf "bio = %p; cur - bio generation = %u; biocmd = %lx\n", \
+			$ppga_bio, cur_generation - $ppga_bio->bio_generation,\
+			$ppga_bio->bio_cmd
+		set $ppga_bio = $ppga_bio->bio_prioq_next.tqe_next
+	end
+end
+
+define print_deadlineq_generations_age_all
+	set $pdgaa_g_disk = g_disk_class
+	set $pdgaa_geom = $pdgaa_g_disk.geom.lh_first
+
+	while ($pdgaa_geom != 0)
+		set $pdgaa_dp = (struct disk *)$pdgaa_geom->softc
+		set $pdgaa_iip = $pdgaa_dp->d_iip
+
+		printf "Bio generation stats for drive %d\n", $pdgaa_dp->d_unit
+		set $pdgaa_bio = $pdgaa_iip->deadlineq.tqh_first
+		while ($pdgaa_bio != 0)
+			printf "bio = %p; cur - bio generation = %u; biocmd = %lx; offset: %u\n", \
+				$pdgaa_bio, cur_generation - $pdgaa_bio->bio_generation,\
+				$pdgaa_bio->bio_cmd, $pdgaa_bio->bio_offset
+			set $pdgaa_bio_parent = $pdgaa_bio->bio_parent
+			while ($pdgaa_bio_parent != 0)
+			  printf "parent: %p\t", $pdgaa_bio_parent
+			  set $pdgaa_bio_parent = $pdgaa_bio_parent->bio_parent
+			end
+			printf "\n"
+			set $pdgaa_bio = $pdgaa_bio->bio_deadlineq_next.tqe_next
+		end
+		set $pdgaa_geom = $pdgaa_geom->geom.le_next
+	end
+end
+
+define iosched_bio_qpos
+	set $ibq_iip = $arg0
+	set $ibq_bio = $arg1
+
+	printf "Searching in prioq\n"
+	set $ibq_tbio = $ibq_iip->prioq.tqh_first
+	set $ibq_pos = 0
+	while ($ibq_tbio != 0)
+		if ($ibq_tbio == $ibq_bio)
+			printf "pos in prioq = %d\n", $ibq_pos
+			loop_break
+		end
+		set $ibq_tbio = $ibq_tbio->bio_prioq_next.tqe_next
+		set $ibq_pos = $ibq_pos + 1
+	end
+
+	set $ibq_tbio = $ibq_iip->diskq.tqh_first
+	set $ibq_pos = 0
+	while ($ibq_tbio != 0)
+		if ($ibq_tbio == $ibq_bio)
+			printf "pos in diskq = %d\n", $ibq_pos
+			loop_break
+		end
+		set $ibq_tbio = $ibq_tbio->bio_diskq_next.tqe_next
+		set $ibq_pos = $ibq_pos + 1
+	end
+
+	set $ibq_tbio = $ibq_iip->deadlineq.tqh_first
+	set $ibq_pos = 0
+	while ($ibq_tbio != 0)
+		if ($ibq_tbio == $ibq_bio)
+			printf "pos in deadlineq = %d\n", $ibq_pos
+			loop_break
+		end
+		set $ibq_tbio = $ibq_tbio->bio_deadlineq_next.tqe_next
+		set $ibq_pos = $ibq_pos + 1
+	end
+end
+
+define print_all_iips
+	set $pai_g_disk = g_disk_class
+	set $pai_geom = $pai_g_disk.geom.lh_first
+
+	while ($pai_geom != 0)
+		set $pai_dp = (struct disk *)$pai_geom->softc
+		set $pai_iip = $pai_dp->d_iip
+		printf "dp: %p, iip: %p, iip->total_inqueue = %d\n", $pai_dp, $pai_iip, $pai_iip->total_inqueue
+		set $pai_geom = $pai_geom->geom.le_next
+	end
+end
+
+define print_bio_ancestry
+	set $_bio_in_queue = (struct bio*)$arg0
+	while ($_bio_in_queue)
+		printf "%p -> ", $_bio_in_queue
+		set $_bio_in_queue = $_bio_in_queue->bio_parent
+	end
+	printf "\n"
+end
+
+define print_all_iips_and_driver_bios_ancestry_with_age
+	set $time_of_panic = $arg0
+	set $pai_g_disk = g_disk_class
+	set $pai_geom = $pai_g_disk.geom.lh_first
+	while ($pai_geom != 0)
+		set $pai_sc = (struct g_disk_softc *)($pai_geom->softc)
+		set $pai_dp =  (struct disk *) ($pai_sc->dp)
+		set $pai_iip = $pai_dp->d_iip
+		printf "%s, dp: %p, iip: %p, is_ssd: %d, latency %d, read_epoch.bio_inqueue %d, write_epoch.bio_inqueue %d, sent %lu, starved %lu, completed %lu, epochs %lu\n", $pai_geom->name, $pai_dp, $pai_iip, $pai_iip->ssd, $pai_iip->stats.latency, $pai_iip->read_epoch.bio_inqueue, $pai_iip->write_epoch.bio_inqueue, $pai_iip->num_sent, $pai_iip->num_starved, $pai_iip->num_completed, $pai_iip->num_epochs
+		set $bio_in_queue = $pai_iip->driverq.tqh_first
+		while ($bio_in_queue)
+			printf "\tdriverq.bio_inqueue (->parent): cmd: %d, outstanding: %d secs, waited: %d secs, arrival_depth: %d, ", $bio_in_queue->bio_cmd, ($time_of_panic - $bio_in_queue->bio_tdstart_ticks) / tsc_freq, ($bio_in_queue->bio_tdstart_ticks - $bio_in_queue->bio_arrival_ticks) / tsc_freq, $bio_in_queue->bio_arrival_depth
+			print_bio_ancestry $bio_in_queue
+			set $bio_in_queue = $bio_in_queue->bio_diskq_next.tqe_next
+		end
+	set $pai_geom = $pai_geom->geom.le_next
+	end
+end
+
+define print_all_idts
+	set $pai_g_disk = g_disk_class
+	set $pai_geom = $pai_g_disk.geom.lh_first
+
+	while ($pai_geom != 0)
+		set $pai_dp = (struct disk *)$pai_geom->softc
+		set $pai_idt = $pai_dp->d_idt
+		#printf "d_unit: %d, idt: %p, hi: %u, avg: %u\n", $pai_dp->d_unit, $pai_idt, $pai_idt->idt_access_hi, $pai_idt->idt_access_avg
+		printf "dp: %p, d_unit: %d, idt: %p, hi: %u\n", $pai_dp, $pai_dp->d_unit, $pai_idt, $pai_idt->idt_access_hi
+		set $pai_geom = $pai_geom->geom.le_next
+	end
+end
+
+###########################################
+#    COALESCER DEBUGGING                  #
+###########################################
+
+# coal_list_all - Print all coalescers
+define coal_list_all
+	set $first = g_coal.coalescers.tqh_first
+	set $next = $first
+	while ($next)
+		printf "%p, ", $next
+		set $next = $next->c_entry.tqe_next
+		if ($next == $first)
+			loop_break
+		end
+	end
+	printf "\n"
+end
+
+# coal_list_global_regions - Print all regions in the global mru list
+define coal_list_global_regions
+	printf "Forced regions:\n"
+	set $first = g_coal.cregion_mru_forced_head.tqh_first
+	set $next = $first
+	while ($next)
+		printf "%p, ", $next
+		set $next = $next->cr_mru_next.tqe_next
+		if ($next == $first)
+			loop_break
+		end
+	end
+	printf "\n"
+	printf "Non-forced regions:\n"
+	set $first = g_coal.cregion_mru_unforced_head.tqh_first
+	set $next = $first
+	while ($next)
+		printf "%p, ", $next
+		set $next = $next->cr_mru_entry.tqe_next
+		if ($next == $first)
+			loop_break
+		end
+	end
+	printf "\n"
+end	
+
+
+# coal_list_regions - Print all regions for a given coalescer
+define coal_list_regions
+	set $c = (struct coalescer *)$arg0
+
+	set $first = $c->c_regions.tqh_first
+	set $next = $first
+	while ($next)
+		printf "%p, ", $next
+		set $next = $next->cr_c_entry.tqe_next
+		if ($next == $first)
+			loop_break
+		end
+	end
+	printf "\n"
+end
+
+# coal_find_coal - find the coalescer in the global list
+define coal_find_coal
+	set $c = (struct coalescer *)$arg0
+
+	set $first = g_coal.coalescers.tqh_first
+	set $next = $first
+	while ($next)
+		if ($next == $c)
+			printf "found!\n"
+			loop_break
+		end
+		set $next = $next->c_next.tqe_next
+		if ($next == $first)
+			loop_break
+		end
+	end
+end
+
+# coal_find_region - find the region in the given coalescer
+# $arg0 = coalescer
+# $arg1 = cregion
+define coal_find_region
+	set $c = (struct coalescer *)$arg0
+	set $cr = (struct cregion *)$arg1
+
+	set $first = $c->c_regions.tqh_first
+	set $next = $first
+	while ($next)
+		if ($next == $cr)
+			printf "found!\n"
+			loop_break
+		end
+		set $next = $next->cr_c_next.tqe_next
+		if ($next == $first)
+			loop_break
+		end
+	end
+end
+
+# coal_find_global_region - find the coalescer region in the global list
+define coal_find_global_region
+	set $cr = (struct cregion *)$arg0
+
+	printf "Searching forced regions"
+	set $first = g_coal.cregion_mru_forced_head.tqh_first
+	set $next = $first
+	while ($next)
+		if ($next == $cr)
+			printf "found!\n"
+			loop_break
+		end
+		set $next = $next->cr_mru_next.tqe_next
+		if ($next == $first)
+			loop_break
+		end
+	end
+
+	printf "Searching non-forced regions"
+	set $first = g_coal.cregion_mru_unforced_head.tqh_first
+	set $next = $first
+	while ($next)
+		if ($next == $cr)
+			printf "found!\n"
+			loop_break
+		end
+		set $next = $next->cr_mru_next.tqe_next
+		if ($next == $first)
+			loop_break
+		end
+	end
+end	
+
+# coal_find_coal_for_region - find the coalescer corresponding to the region
+define coal_find_coal_for_region
+	set $cr = (struct cregion *)$arg0
+	set $found = 0
+
+	set $c_first = g_coal.coalescers.lh_first
+	set $c_next = $c_first
+	while (!$found && $c_next)
+		set $cr_first = $c_next->c_regions.tqh_first
+		set $cr_next = $cr_first
+		while (!$found && $cr_next)
+			if ($cr_next == $cr)
+				printf "coal = %p\n", $c_next
+				set $found = 1
+			end
+			set $cr_next = $cr_next->cr_c_next.tqe_next
+			if ($cr_next == $cr_first)
+				loop_break
+			end
+		end
+		set $c_next = $c_next->c_next.le_next
+		if ($c_next == $c_first)
+			loop_break
+		end
+	end
+end
+
+
+define print_flist
+       set $f_list = filehead->lh_first
+       if ($f_list)
+         printf "  file_list: { "
+	 while ($f_list)
+	   printf "f_ptr: %p\n", $f_list
+	   printf "f_vnode: %p\n", $f_list->f_vnode
+	   printf "f_type: %d\n", $f_list->f_type
+	   set $f_list = $f_list->f_list->le_next
+	   if ($f_list)
+	     printf ", "
+	   end
+	 end
+	 printf " }\n"
+       end
+       printf "}\n"
+end
+
+###
+# Stats
+###
+define show_proto_stats
+	set $proto = 1
+	while ($proto < 8)
+		set $i = 0
+		set $seen_proto = 0
+		while ($i < protocols[$proto].num_ops)
+			set $count = protocols[$proto].inst_stats[$i].count
+			if ($count > 0)
+				if ($seen_proto == 0)
+					printf "Protocol: %s\n",protocols[$proto].name
+					set $seen_proto = 1
+				end
+				printf "\t%d\t%s\n",$count,protocols[$proto].ops[$i].name
+			end
+			set $i = $i + 1
+		end
+		set $proto = $proto + 1
+	end
+end
+document show_proto_stats
+Looks in the stats for the protocols, and prints out non-zero counts
+end
+
+define show_prev_proto_stats
+	set $proto = 1
+	while ($proto < 8)
+		set $i = 0
+		set $seen_proto = 0
+		while ($i < protocols[$proto].num_ops)
+			set $count = protocols[$proto].prev_stats[$i].count
+			if ($count > 0)
+				if ($seen_proto == 0)
+					printf "Protocol: %s\n",protocols[$proto].name
+					set $seen_proto = 1
+				end
+				printf "\t%d\t%s\n",$count,protocols[$proto].ops[$i].name
+			end
+			set $i = $i + 1
+		end
+		set $proto = $proto + 1
+	end
+end
+document show_prev_proto_stats
+Looks in the previous stats for the protocols, and prints out non-zero counts
+end
+
+define uptime
+	printf "hostname: %s\n",hostname
+	printf "now : %d\n",boottimebin.sec + timehands->th_offset.sec
+	printf "up  : %d:%d\n",timehands->th_offset.sec,		\
+		((uint32_t)(timehands->th_offset.frac >> 32) * (uint64_t)1000000000 ) >> 32
+	printf "lavg: %f %f %f\n",	\
+		(float)(averunnable.ldavg[0])/averunnable.fscale,	\
+		(float)(averunnable.ldavg[1])/averunnable.fscale,	\
+		(float)(averunnable.ldavg[2])/averunnable.fscale
+end
+document uptime
+Some basic who/when/where
+end
+
+define list_dexits
+	set $size = sizeof(dexitcode_ring)/sizeof(dexitcode_ring[0])
+	set $count = 20
+	set $i = $size - $count
+	printf "pid\ttid\tentry\terror\tfunction\n"
+	while ($i < $size)
+		set $offset = (dexitcode_pos+1+$i)&($size - 1)
+		printf "%d\t%d\t%d\t%d\t%s\n", dexitcode_ring[$offset].pid,\
+			dexitcode_ring[$offset].tid, $offset,\
+			dexitcode_ring[$offset].error,\
+			dexitcode_ring[$offset].function
+		set $i = $i + 1
+	end
+end
+document list_dexits
+	Pretty-prints out the dexit ring
+end
+define dump_dexits
+	set $size = sizeof(dexitcode_ring)/sizeof(dexitcode_ring[0])
+	set $count = $size
+	set $i = $size - $count
+	printf "pid\ttid\tentry\terror\tfunction\n"
+	while ($i < $size)
+		set $offset = (dexitcode_pos+1+$i)&($size - 1)
+		printf "%d\t%d\t%d\t%d\t%s\n", dexitcode_ring[$offset].pid,\
+			dexitcode_ring[$offset].tid, $offset,\
+			dexitcode_ring[$offset].error,\
+			dexitcode_ring[$offset].function
+		set $i = $i + 1
+	end
+end
+document dump_dexits
+	Pretty-prints out the whole dexit ring
+end
+
+# This uses array indexing instead of pointer dereference so it works
+# with literals passed in on the gdb command line.
+define strcmp
+  set $mysc_v1 = $arg0
+  set $mysc_v2 = $arg1
+  set $mysc_idx = 0
+  while 1
+    if $mysc_v1[$mysc_idx] != $mysc_v2[$mysc_idx]
+      set $strcmp_ret = ((int) $mysc_v1[$mysc_idx]) - ((int) $mysc_v2[$mysc_idx])
+      loop_break
+    end
+    if !$mysc_v1[$mysc_idx]
+      set $strcmp_ret = 0
+      loop_break
+    end
+    set $mysc_idx = $mysc_idx + 1
+  end
+end
+document strcmp
+	This is the usual C library function strcmp(), implemented as
+	a gdb script. It can handle strings constructed as arrays on
+	the console as well as strings in the program being debugged.
+end
+
+define find_sysctl_child
+  set $fsc_oidp = ((struct sysctl_oid_list *) $arg0)->slh_first
+  set $fsc_name = $arg1
+  while $fsc_oidp
+    strcmp $fsc_oidp->oid_name $fsc_name
+    if $strcmp_ret == 0
+      print $fsc_oidp
+      loop_break
+    end
+    set $fsc_oidp = $fsc_oidp->oid_link.sle_next
+  end
+end
+document find_sysctl_child
+	Given a sysctl_oid_list and a name, find the child oid with that name.
+end
+
+define find_sysctl
+  set $fs_list = &sysctl__children
+  set $fs_oidp = 0
+  set $fs_idx = 0
+  while $fs_idx < $argc
+    # gdb allows up to 10 arguments
+    if $fs_idx == 0
+      set $fs_name = $arg0
+    end
+    if $fs_idx == 1
+      set $fs_name = $arg1
+    end
+    if $fs_idx == 2
+      set $fs_name = $arg2
+    end
+    if $fs_idx == 3
+      set $fs_name = $arg3
+    end
+    if $fs_idx == 4
+      set $fs_name = $arg4
+    end
+    if $fs_idx == 5
+      set $fs_name = $arg5
+    end
+    if $fs_idx == 6
+      set $fs_name = $arg6
+    end
+    if $fs_idx == 7
+      set $fs_name = $arg7
+    end
+    if $fs_idx == 8
+      set $fs_name = $arg8
+    end
+    if $fs_idx == 9
+      set $fs_name = $arg9
+    end
+    find_sysctl_child $fs_list $fs_name
+    set $fs_oidp = $fsc_oidp
+    if !$fs_oidp
+      loop_break
+    end
+    set $fs_list = $fs_oidp->oid_arg1
+    set $fs_idx = $fs_idx + 1
+  end
+end
+document find_sysctl
+	Find a sysctl oid struct. This can be a useful way to get
+	to structures which are only accessible through sysctl argument
+	pointers.
+
+	This function expects a list of strings which allow it to
+	walk the sysctl tree. For example:
+
+		find_sysctl "efs" "journal" "drives"
+
+	However, due to limited array allocation on the gdb console,
+	this may not actually work. If you see the error
+
+		Too many array elements
+
+	try copying the strings into temporary variables and
+	pass those to the function. For example:
+
+		set $journal = "journal"
+		set $drives = "drives"
+		find_sysctl "efs" $journal $drives
+end
+
+define find_set_fail_points
+  set $ffp_efs = "efs"
+  set $ffp_fail_point = "fail_point"
+  find_sysctl $ffp_efs $ffp_fail_point
+  set $ffp_prev_fpptr = 0
+  set $ffp_oid = ((struct sysctl_oid_list *) $fs_oidp->oid_arg1)->slh_first
+  while $ffp_oid
+    set $ffp_fpptr = (struct fail_point *) $ffp_oid->oid_arg1
+    # multiple sysctls per fail point, avoid dups
+    if ($ffp_fpptr != $ffp_prev_fpptr && $ffp_fpptr->fp_entries)
+      print *$ffp_fpptr
+    end
+    set $ffp_prev_fpptr = $ffp_fpptr
+    set $ffp_oid = $ffp_oid->oid_link.sle_next
+  end
+end
+
+define find_fail_point
+  set $ffp_efs = "efs"
+  set $ffp_fail_point = "fail_point"
+  find_sysctl $ffp_efs $ffp_fail_point $arg0
+  if $fs_oidp
+    print *(struct fail_point *) $fs_oidp->oid_arg1
+  end
+end
+document find_fail_point
+	Find a fail point structure by name by walking the sysctl
+	tree. Expects a string. See the find_sysctl documentation
+	for limitations.
+end
+
+define log_stuff
+	set logging off
+	set logging redirect on
+
+	set logging file status.txt
+	set logging on
+	print hostname
+	uptime
+	set logging off
+
+	set logging file threads.txt
+	set logging on
+	info threads
+	thread apply all bt
+	set logging off
+	
+	set logging file show_procs64.txt
+	set logging on
+	show_procs64
+	set logging off
+
+	set logging file dexitcode.txt
+	set logging on
+	dump_dexits
+	set logging off
+
+#	set logging file umazones.txt
+#	set logging on
+#	showumapools
+#	set logging off
+#
+#	set logging file malloc.txt
+#	set logging on
+#	showmallocpools0
+#	set logging off
+
+	syslogdump msgbuf
+
+	set logging redirect off
+end
+document log_stuff
+	Creates 5 text files with semi-useful standard status information
+	from the minidump.  Useful as a batch process
+end
+
+define ntohl
+	set $q1=((($arg0) & 0xff)       << 24)
+	set $q2=((($arg0) & 0xff00)     << 8)
+	set $q3=((($arg0) & 0xff0000)   >> 8)
+	set $q4=((($arg0) & 0xff000000) >> 24)
+	print $q1|$q2|$q3|$q4
+end
+document ntohl
+	Prints out the argument byteswapped
+end
+
+define printaddr
+	set $q1=((($arg0) & 0xff)       >> 0)
+	set $q2=((($arg0) & 0xff00)     >> 8)
+	set $q3=((($arg0) & 0xff0000)   >> 16)
+	set $q4=((($arg0) & 0xff000000) >> 24)
+	printf "%d.%d.%d.%d\n",$q1,$q2,$q3,$q4
+end
+document printaddr
+	Prints out provided network-order integer in dotted-quad
+end
+
+define sc_lookup
+	set $wchan=$arg0
+	set $hash=(((uintptr_t)($wchan) >> 8) & 127)
+	set $sq=sleepq_chains[$hash].sc_queues.lh_first
+	while ($sq != 0 && $sq->sq_wchan != $wchan)
+		set $sq = $sq->sq_hash.le_next
+	end
+	print $sq
+end
+document sc_lookup
+	Prints the sleepq for a given wchan
+end
+
+define check_swatchdog
+    set $size = sizeof(swatch_cpu_state)/sizeof(swatch_cpu_state[0])-1 
+
+    printf "CPU states:\n"
+    while ( $size >= 0)
+        set $cpu = swatch_cpu_state[$size]
+        if ($cpu.ticks != 0 || $cpu.generation != 0)
+            printf "CPU: %d\tthread: %llx\twarnings: %d\tticks: %d\tgeneration: %u\tstate:%d\n", \
+                $size, $cpu.td, $cpu.num_warnings, $cpu.ticks, $cpu.generation, $cpu.td.td_state
+        end
+        set $size = $size - 1
+    end
+
+    set $su = swatch_userspace
+    printf "CPU 0 - US starvation:\n"
+    printf "\tthread: %llx\twarnings: %d\tticks: %d\tgeneration: %u\n", $su.td, \
+        $su.num_warnings, $su.ticks, $su.generation
+
+end
+document check_swatchdog
+    show cpu states to find the cpu hog that caused to panic.
+    ref:src/sys/kern/isi_swatchdog.c
+end
+
+####################
+# OF GENERAL UTILITY
+####################
+
+define add_modules
+  python
+## Start of Python Script ##
+module = gdb.lookup_symbol("linker_files")[0].value()['tqh_first']
+
+# Traverse Module List Skipping the First (kernel)
+while module.dereference()['link']['tqe_next'] != 0:
+
+  module = module.dereference()['link']['tqe_next']
+  elf = module.cast(gdb.lookup_type("elf_file_t")).dereference()
+  progtab = elf['progtab']
+  e_shdr = elf['e_shdr']
+
+  filename = module['filename'].string()
+  dottext = ""
+  others = []
+
+  # Traverse each ELF section
+  for i in xrange(elf['nprogtab']):
+    curprogtab = progtab[i]
+    addr = curprogtab['addr']
+    name = curprogtab['name'].string()
+    sec = curprogtab['sec']
+    sh_flags = e_shdr[sec]['sh_flags']
+
+    # Check is a symbol table
+    if sh_flags & 2 == 2: # SHT_SYMTAB
+      if name == ".text":
+        dottext = addr
+      elif addr:
+        others.append("-s %s %s " % (name, addr))
+
+  # Add resulting symbol file to gdb
+  finalcmd = "add-symbol-file %s %s %s" % (filename, dottext, ''.join(others))
+  gdb.execute(finalcmd)
+## End of Python Script ##
+  end
+end
+
+##############
+# VM DEBUGGING
+##############
+
+#def dump_kernel_pmap
+#  set $dkp_l4 = (pml4_entry_t *) kernel_pmap_store->pm_pml4
+#  set $dkp_direct = 0xfffff80000000000
+#  set $dkp_entries = 512
+#
+#  set $dkp_i = (unsigned long) 0
+#  while ($dkp_i < $dkp_entries)
+#    if ($dkp_l4[$dkp_i] & 1)
+#      set $dkp_ix = ($dkp_i & 0x100) ? (0x1FFFE00 | $dkp_i) : $dkp_i
+#      set $dkp_l3 = (pdp_entry_t *) ($dkp_direct | ($dkp_l4[$dkp_i] & ~0xFFF))
+#      set $dkp_j = (unsigned long) 0
+#      while ($dkp_j < $dkp_entries)
+#        if ($dkp_l3[$dkp_j] & 1)
+#          if ($dkp_l3[$dkp_j] & 0x80)
+#            set $dkp_vaddr = ($dkp_ix << 39) | ($dkp_j << 30)
+#            set $dkp_paddr = $dkp_l3[$dkp_j] & ~0xFFF
+#            printf "%p %p [1G]\n", $dkp_vaddr, $dkp_paddr
+#          else
+#            set $dkp_l2 = (pt_entry_t *) ($dkp_direct | ($dkp_l3[$dkp_j] & ~0xFFF))
+#            set $dkp_k = (unsigned long) 0
+#            while ($dkp_k < $dkp_entries)
+#              if ($dkp_l2[$dkp_k] & 1)
+#                if ($dkp_l2[$dkp_k] & 0x80)
+#                  set $dkp_vaddr = ($dkp_ix << 39) | ($dkp_j << 30) | ($dkp_k << 21)
+#                  set $dkp_paddr = $dkp_l2[$dkp_k] & ~0xFFF
+#                  printf "%p %p [2M]\n", $dkp_vaddr, $dkp_paddr
+#                else
+#                  set $dkp_l1 = (pd_entry_t *) ($dkp_direct | ($dkp_l2[$dkp_k] & ~0xFFF))
+#                  set $dkp_m = (unsigned long) 0
+#                  while ($dkp_m < $dkp_entries)
+#                    if ($dkp_l1[$dkp_m] & 1)
+#                      set $dkp_vaddr = ($dkp_ix << 39) | ($dkp_j << 30) | ($dkp_k << 21) | ($dkp_m << 12)
+#                      set $dkp_paddr = $dkp_l1[$dkp_m] & ~0xFFF
+#                      printf "%p %p\n", $dkp_vaddr, $dkp_paddr
+#                    end
+#                    set $dkp_m = $dkp_m + 1
+#                  end
+#                end
+#              end
+#              set $dkp_k = $dkp_k + 1
+#            end
+#          end
+#        end
+#        set $dkp_j = $dkp_j + 1
+#      end
+#    end
+#    set $dkp_i = $dkp_i + 1
+#  end
+#end
+#document dump_kernel_pmap
+#	Dumps the kernel virtual->physical mapping, very verbosely.
+#end
+
+#\$include .gdbinit
