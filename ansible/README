@@ -10,6 +10,8 @@ server ip3 -- (e.g. 10.227.237.23)
 ansible_user=root
 ansible_password=a
 
+# ping all the servers
+ansible all -e 'ansible_user=root ansible_password=a' -m ping
 
 # playbook hello world
 ansible-playbook playbook/hello_world/hello_world.yml
