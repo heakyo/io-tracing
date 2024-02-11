@@ -13,7 +13,7 @@ set print pretty on
 set print array-indexes on
 set disassemble-next-line off
 define tgt_conn
-	printf "Begin connection ..... \n", 
+	printf "Begin connection ..... \n"
 	#set substitute-path /root/isilon_mnt/src /home/marvin/isilon/isi-src/onefs
 	set substitute-path /b/mnt/src /home/marvin/isilon/isi-src/freebsd/bk-onefs/onefs	
 	cd /home/marvin/symbols	
@@ -21,23 +21,99 @@ define tgt_conn
 	target remote localhost:9801
 	#target remote localhost:1801
 	#target remote localhost:2801
-	printf "connected ..... \n", 
+	printf "connected ..... \n"
 end
 
 ######################################################
 #    		marvin gold_dust    		     #
 ######################################################
 define gd_show_bh_anchor
-	printf "Show bh_anchor ..... \n",
-
 	set $_anchor = bh_anchor
-	if (! $_anchor.tqh_first)
-		printf "bh_anchor is empty!"
+	set $_bh = $_anchor.tqh_first
+
+	if (!$_bh)
+		printf "bh_anchor is empty!\n"
 		return
 	end
 	
-	set $node = $_anchor.tqh_first
-	printf "BH(%s)\n", $node->name
+	printf "Block Heap ..... \n"
+	printf "name\t\t blksz\t count\t pool\n"
+	while ($_bh)
+		printf "%s\t %zu\t %zu\t %p\n", \
+			$_bh->name, $_bh->blksz, $_bh->count ,$_bh->pool
+
+		set $_bp = $_bh->pool
+		while ($_bp)
+			printf "  |--bp->%p(next)---%zu(count)---%p(memptr)\n", \
+				$_bp->next, $_bp->count, $_bp->memptr
+			set $_bp = $_bp->next
+		end
+
+		set $_bh = $_bh->heaps.tqe_next
+	end
+end
+
+define gd_show_vm_phys_segs
+	set $_i = 0
+
+	printf "VM PHYS NSEGS: %d\n", vm_phys_nsegs
+	printf "Index\t start\t\t end\t\t domain\n"
+	while ($_i < vm_phys_nsegs)
+
+		printf "seg[%d]:\t %p\t %p\t %d\n", \
+			$_i, vm_phys_segs[$_i].start, vm_phys_segs[$_i].end, \
+			vm_phys_segs[$_i].domain
+
+		set $_i = $_i + 1
+	end
+end
+
+# arg0: tqh head
+# arg1: tqe field
+# gd_show_tql bh_anchor heaps
+define gd_show_tql
+	set $_cnt = 0
+	set $_ev = $arg0.tqh_first
+
+	while $_ev
+		printf "%p\n", $_ev
+		set $_ev = $_ev->$arg1.tqe_next
+
+		set $_cnt = $_cnt + 1
+	end
+
+	printf "Total Count: %d\n", $_cnt
+end
+
+# $arg0: vmd->vmd_pagequeue
+# gd_show_pgq vmd->vmd_pagequeues
+define gd_show_pgq
+	set $_pqcnt = 4
+	set $_j = 0
+	set $_pq = $arg0
+
+	while ($_j < $_pqcnt)
+		printf "  |--pq%d->%s(name)---%d(cnt)---%ld(pdpages)---%p(pl)\n", $_j, \
+			$_pq->pq_name, $_pq->pq_cnt, $_pq->pq_pdpages, &$_pq->pq_pl
+		set $_j = $_j + 1
+		set $_pq = $_pq + 1
+	end
+end
+
+define gd_show_vm_domain
+	set $_i = 0
+
+	printf "VM NDOMS: %d\n", vm_ndomains
+	printf "Index\t name\t bitsegs\t pgcnt\t freecnt\t oom\n"
+	while ($_i < vm_ndomains)
+
+		set $_vmd = &vm_dom[$_i]
+		printf "%d\t %s\t %x\t\t %d\t %d\t\t %d\n", $_vmd->vmd_domain, \
+			$_vmd->vmd_name, $_vmd->vmd_segs, $_vmd->vmd_page_count, \
+			$_vmd->vmd_free_count, $_vmd->vmd_oom
+		gd_show_pgq $_vmd->vmd_pagequeues
+		set $_i = $_i + 1
+	end
 end
 ######################################################
 #    A note about scoping in gdb script functions    #
