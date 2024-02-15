@@ -70,8 +70,11 @@ end
 
 # arg0: tqh head
 # arg1: tqe field
-# gd_show_tql bh_anchor heaps
+# E.G.
+# 	gd_show_tql bh_anchor heaps
+# 	gd_show_tql vm_dom[0].vmd_pagequeues[0].pq_pl plinks.q
 define gd_show_tql
+
 	set $_cnt = 0
 	set $_ev = $arg0.tqh_first
 
@@ -87,11 +90,12 @@ end
 
 # $arg0: vmd->vmd_pagequeue
 # gd_show_pgq vmd->vmd_pagequeues
-define gd_show_pgq
+define gd_show_vmd_pagequeue
 	set $_pqcnt = 4
 	set $_j = 0
 	set $_pq = $arg0
 
+	printf "  -vmd_pagequeue\n"
 	while ($_j < $_pqcnt)
 		printf "  |--pq%d->%s(name)---%d(cnt)---%ld(pdpages)---%p(pl)\n", $_j, \
 			$_pq->pq_name, $_pq->pq_cnt, $_pq->pq_pdpages, &$_pq->pq_pl
@@ -100,18 +104,62 @@ define gd_show_pgq
 	end
 end
 
+define gd_show_vmd_markers
+	set $_pqcnt = 4
+	set $_j = 0
+	set $_vmpg_markers = $arg0
+
+	printf "  -vmd_markers\n"
+	while ($_j < $_pqcnt)
+		printf "  |--%d->%p---%p(flags(PG_XXX))---%p,%d(a.(flags,queue)\n", \
+			$_j, &$_vmpg_markers[$_j], $_vmpg_markers[$_j].flags, \
+			$_vmpg_markers[$_j].a.flags, $_vmpg_markers[$_j].a.queue
+
+		set $_j = $_j + 1
+	end
+end
+
+define gd_show_vmd_clock
+	set $_clkcnt = 2
+	set $_j = 0
+	set $_clk = $arg0
+
+	printf "  -vmd_clock\n"
+	while ($_j < $_clkcnt)
+		printf "  |--%d->%p---%p(flags(PG_XXX))---%p,%d(a.(flags,queue)\n", \
+			$_j, &$_clk[$_j], $_clk[$_j].flags, $_clk[$_j].a.flags, \
+			$_clk[$_j].a.queue
+
+		set $_j = $_j + 1
+	end
+end
+
+define gd_show_vmd_inacthead
+	set $_inacthead = &$arg0
+
+	printf "  -vmd_inacthead\n"
+	printf "  |---->%p---%p(flags(PG_XXX))---%p,%d(a.(flags,queue)\n", \
+		$_inacthead, $_inacthead->flags, $_inacthead->a.flags, \
+		$_inacthead->a.queue
+end
+
 define gd_show_vm_domain
 	set $_i = 0
 
 	printf "VM NDOMS: %d\n", vm_ndomains
-	printf "Index\t name\t bitsegs\t pgcnt\t freecnt\t oom\n"
+	printf "Index\t name\t bitsegs\t pgcnt\t\t freecnt\t oom\n"
 	while ($_i < vm_ndomains)
 
 		set $_vmd = &vm_dom[$_i]
-		printf "%d\t %s\t %x\t\t %d\t %d\t\t %d\n", $_vmd->vmd_domain, \
+		printf "%d\t %s\t %x\t\t %d\t %d\t %d\n", $_vmd->vmd_domain, \
 			$_vmd->vmd_name, $_vmd->vmd_segs, $_vmd->vmd_page_count, \
 			$_vmd->vmd_free_count, $_vmd->vmd_oom
-		gd_show_pgq $_vmd->vmd_pagequeues
+
+		gd_show_vmd_pagequeue $_vmd->vmd_pagequeues
+		gd_show_vmd_markers $_vmd->vmd_markers
+		gd_show_vmd_clock $_vmd->vmd_clock
+		gd_show_vmd_inacthead $_vmd->vmd_inacthead
+
 		set $_i = $_i + 1
 	end
 end
