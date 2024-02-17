@@ -53,16 +53,43 @@ define gd_show_bh_anchor
 	end
 end
 
+define _gd_show_vm_freelist
+	set $_fq = (struct vm_freelist (*)[2][13])$arg0
+	set $_j = 0
+	set $_k = 0
+
+	#printf "%p\n", vm_phys_free_queues[0][0]
+	#printf "%p\n", $_fq
+
+	while ($_j < 2)
+
+		set $_k = 0
+		printf "  |--%d\n", $_j
+
+		while ($_k < 13)
+			printf "  |--%d-%d(pl-od)->%d(lcnt)\n", $_j, $_k, \
+				(*$_fq)[$_j][$_k].lcnt
+			set $_k = $_k + 1
+		end
+
+		printf "  |-------------------\n",
+		set $_j = $_j + 1
+	end
+end
+
 define gd_show_vm_phys_segs
 	set $_i = 0
 
 	printf "VM PHYS NSEGS: %d\n", vm_phys_nsegs
-	printf "Index\t start\t\t end\t\t domain\n"
+	printf "Index\t start\t\t end\t\t domain\t first_page\t free_queues\n"
 	while ($_i < vm_phys_nsegs)
 
-		printf "seg[%d]:\t %p\t %p\t %d\n", \
+		printf "seg[%d]:\t %p\t %p\t %d\t %p\t %p\n", \
 			$_i, vm_phys_segs[$_i].start, vm_phys_segs[$_i].end, \
-			vm_phys_segs[$_i].domain
+			vm_phys_segs[$_i].domain, vm_phys_segs[$_i].first_page, \
+			vm_phys_segs[$_i].free_queues
+
+		_gd_show_vm_freelist vm_phys_segs[$_i].free_queues
 
 		set $_i = $_i + 1
 	end
@@ -90,7 +117,7 @@ end
 
 # $arg0: vmd->vmd_pagequeue
 # gd_show_pgq vmd->vmd_pagequeues
-define gd_show_vmd_pagequeue
+define _gd_show_vmd_pagequeue
 	set $_pqcnt = 4
 	set $_j = 0
 	set $_pq = $arg0
@@ -104,7 +131,7 @@ define gd_show_vmd_pagequeue
 	end
 end
 
-define gd_show_vmd_markers
+define _gd_show_vmd_markers
 	set $_pqcnt = 4
 	set $_j = 0
 	set $_vmpg_markers = $arg0
@@ -119,7 +146,7 @@ define gd_show_vmd_markers
 	end
 end
 
-define gd_show_vmd_clock
+define _gd_show_vmd_clock
 	set $_clkcnt = 2
 	set $_j = 0
 	set $_clk = $arg0
@@ -134,7 +161,7 @@ define gd_show_vmd_clock
 	end
 end
 
-define gd_show_vmd_inacthead
+define _gd_show_vmd_inacthead
 	set $_inacthead = &$arg0
 
 	printf "  -vmd_inacthead\n"
@@ -155,10 +182,10 @@ define gd_show_vm_domain
 			$_vmd->vmd_name, $_vmd->vmd_segs, $_vmd->vmd_page_count, \
 			$_vmd->vmd_free_count, $_vmd->vmd_oom
 
-		gd_show_vmd_pagequeue $_vmd->vmd_pagequeues
-		gd_show_vmd_markers $_vmd->vmd_markers
-		gd_show_vmd_clock $_vmd->vmd_clock
-		gd_show_vmd_inacthead $_vmd->vmd_inacthead
+		_gd_show_vmd_pagequeue $_vmd->vmd_pagequeues
+		_gd_show_vmd_markers $_vmd->vmd_markers
+		_gd_show_vmd_clock $_vmd->vmd_clock
+		_gd_show_vmd_inacthead $_vmd->vmd_inacthead
 
 		set $_i = $_i + 1
 	end
