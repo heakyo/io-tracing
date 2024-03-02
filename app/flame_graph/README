@@ -40,3 +40,5 @@ A. make report
                |
                 --6.02%--funcB
                           caculate
+
+# this result is shown with the option -g which represents the direction of callchain is from top to bottom.
