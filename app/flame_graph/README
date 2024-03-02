@@ -1,0 +1,42 @@
+#####
+# This main program is used for the test of flame graph. The program flamegraph.pl and stackcollapse-perf.pl come
+# from the repo https://github.com/brendangregg/FlameGraph.git
+
+1. How to generate flame graph
+A. make flame-graph
+   http://10.124.114.236/linux-perf/flame-graph/main.fg.svg
+
+2. How to get the perf report
+A. make report
+
+# Below perf report shows that the calcute function has almost 100% overhead which means this function
+# is the one which impact the performance. It also shows the callchain of the program main where how the
+# is called in the main whole call stack.
+-------------------------------------------------------------------------------------------------------
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 8K of event 'cycles:u'
+# Event count (approx.): 5562292933
+#
+# Overhead  Command  Shared Object     Symbol
+# ........  .......  ................  ...........................
+#
+    99.99%  main     main              [.] caculate <=== Here
+            |
+            ---0x258d4c54415541d7
+               __libc_start_main
+               main
+               |
+               |--83.99%--funcC
+               |          caculate
+               |
+               |--9.98%--funcA
+               |          funcD
+               |          funcE
+               |          caculate
+               |
+                --6.02%--funcB
+                          caculate

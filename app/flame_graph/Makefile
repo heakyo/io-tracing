@@ -1,7 +1,17 @@
 CFLAGS = -O0 -g
 
 all: main
-	#objdump -dS main > main.dis
+	objdump -dS main > main.dis
+
+record:
+	perf record -g ./main
+
+flame-graph: main record
+	perf script | ./bin/stackcollapse-perf.pl | ./bin/flamegraph.pl > main.fg.svg
+	cp main.fg.svg /home/marvin/docker/docker-server/caddy/src/linux-perf/flame-graph
+
+report: main record
+	perf report -g --no-child --stdio
 
 install:
 	cp -a main /usr/local/bin
@@ -20,4 +30,4 @@ main.o: main.i
 
 .PHONY:clean
 clean:
-	rm -rf main *.i *.o *.dis
+	@rm -rf main *.i *.o *.dis *.svg *. perf.data*

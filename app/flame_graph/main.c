@@ -36,8 +36,6 @@ int main(int argc, char *args[])
 {
     int i;
 
-    printf("Hello Flame Graph\n");
-
     for (i = 0; i < 100; i++) {
 
         if (i < 10) {
