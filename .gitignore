@@ -7,4 +7,5 @@
 *.gcno
 *.gdb_history
 *.log
+main
 __pycache__
