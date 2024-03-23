@@ -1,11 +1,11 @@
 ---
-- name: Print Hello World on Three Nodes
+- name: Print Hello World on All Nodes
   hosts: all
   tasks:
     - name: Hello World
       debug:
 
-- name: Print Peter and May on Three Nodes
+- name: Print Peter and May on ALL Nodes
   hosts: all
   tasks:
     - name: Peter and May
@@ -14,7 +14,7 @@
           - "Peter"
           - "May"
 
-- name: Print Byebye World on Three Nodes
+- name: Print Byebye World on ALL Nodes
   hosts: all
   tasks:
     - name: Byebye World
