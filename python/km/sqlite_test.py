@@ -25,6 +25,9 @@ cursor = conn.cursor()
 #			key_content \
 #			FROM key_record_info ORDER BY key_identifier")
 
+cursor.execute("SELECT major, minor \
+			FROM schema_version LIMIT 1")
+
 cursor.execute("SELECT key_identifier, \
 			domaintype, \
 			key_content, \
