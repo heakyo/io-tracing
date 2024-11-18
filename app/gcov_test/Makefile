@@ -1,7 +1,17 @@
+# Determin OS
+OS := $(shell uname -s)
+
 CFLAGS = -O0 -g -fprofile-arcs -ftest-coverage
 
 INFO = test.info
-IPV4 = $(shell ifconfig bge0 | grep -w inet | column -t | awk '{print $$2}')
+
+ifeq ($(OS), FreeBSD)
+	IPV4 = $(shell ifconfig bge0 | grep -w inet | awk '{print $2}' | cut -d/ -f1)
+else ifeq ($(OS), Linux)
+	IPV4 = $(shell ip a show eth0 | grep -w inet | awk '{print $2}' | cut -d/ -f1)
+else
+	IPV4 = "0.0.0.0"
+endif
 
 all: main
 	#objdump -dS main > main.dis
@@ -13,7 +23,7 @@ cov: main
 
 pyhttp:
 	@echo "http server: $(IPV4):8888"
-	python2 -m SimpleHTTPServer 8888
+	python -m http.server 8888
 
 install:
 	cp -a main /usr/local/bin
