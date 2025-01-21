@@ -15,12 +15,14 @@ set disassemble-next-line off
 define tgt_conn
 	printf "Begin connection ..... \n"
 	#set substitute-path /root/isilon_mnt/src /home/marvin/isilon/isi-src/onefs
-	set substitute-path /b/mnt/src /home/marvin/isilon/isi-src/freebsd/bk-onefs/onefs	
-	cd /home/marvin/symbols	
+	#set substitute-path /b/mnt/src /home/marvin/isilon/isi-src/freebsd/bk-onefs/onefs
+	#cd /home/marvin/symbols
+	cd /tmp/symbols
 	file kernel
-	target remote localhost:9801
+	#target remote localhost:9801
 	#target remote localhost:1801
 	#target remote localhost:2801
+	target remote 172.17.0.4:9801
 	printf "connected ..... \n"
 end
 
@@ -4080,6 +4082,10 @@ while module.dereference()['link']['tqe_next'] != 0:
   dottext = ""
   others = []
 
+  # Just filter the modules you don't need
+  #if filename != "efs.ko" and filename != "idxd.ko":
+    #continue
+
   # Traverse each ELF section
   for i in xrange(elf['nprogtab']):
     curprogtab = progtab[i]
@@ -4097,6 +4103,7 @@ while module.dereference()['link']['tqe_next'] != 0:
 
   # Add resulting symbol file to gdb
   finalcmd = "add-symbol-file %s %s %s" % (filename, dottext, ''.join(others))
+  print("finalcmd:%s" % (finalcmd))
   gdb.execute(finalcmd)
 ## End of Python Script ##
   end
