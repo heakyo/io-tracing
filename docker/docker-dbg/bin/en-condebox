@@ -1,0 +1,141 @@
+#!/usr/bin/env python
+"""
+en-condebox [flags] <console server ip:port> <port>
+  [ -f | --force ] [ -s | --safe ] [-n | --noserial]
+Open condemux to host with starting port <port>
+    --force:    Kick any current user off first
+    --safe:     Don't connect if someone else owns the node
+    --noserial: By default, also connects to the serial port
+    --perm:     Permanent link (don't use condemux's --noretry or --noidle)
+E.G.
+    en-condebox 10.124.115.32:7008 9800
+"""
+
+import errno
+import getopt
+import os
+import sys
+import time
+
+class SerialInfo:
+    def __init__(self, server, port, rate):
+	self.server = server
+	self.port = port
+	self.rate = rate
+
+class Node:
+    def __init__(self, server, port, rate):
+	self.serial_info = SerialInfo(server, port, rate)
+
+if 'QALIB' in os.environ:
+    sys.path.append(os.environ['QALIB'])
+elif 'QA' in os.environ:
+    sys.path.append(os.environ['QA'] + "/lib")
+else:
+    sys.path.append("/usr/local/qa/lib")
+#from isilon import machinedb
+
+def usage(msg = None):
+    print "Usage:", __doc__
+    if msg != None:
+        print "%s" % msg
+    sys.exit(1)
+
+safe_mode = False       # require user to own node
+force     = False       # kick existing console connections; implies safe_mode
+serial    = True        # also connect to serial port
+permanent = False	# use condemux's permanent options
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "fhsnp",
+                                [ "help", "force", "safe", "noserial",
+                                  "perm"])
+except getopt.error, msg:
+    usage(msg)
+
+if not opts and not args:
+    usage()
+
+for o, a in opts:
+    if o in ("-h", "--help"):
+        usage()
+    elif o in ("-f", "--force"):
+        force = True
+    elif o in ("-s", "--safe"):
+        safe_mode = True
+    elif o in ("-n", "--noserial"):
+        serial = False
+    elif o in ("-p", "--perm"):
+        permanent = True
+    else:
+        usage("Unrecognized option")
+
+if len(args) != 2:
+    usage("Incorrect number of arguments")
+
+server, port = args[0].split(':')
+localport = args[1]
+
+try:
+    #node = Node('10.124.115.32', '7008', 115200)
+    node = Node(server, port, 115200)
+    #node = machinedb.Machine(id)
+except Exception, e:
+    print "Error:", e
+    sys.exit(1)
+
+if not node:
+    print "No entry for %s" % id
+    sys.exit(1)
+
+print node.serial_info.rate
+if node.serial_info.rate is None or \
+   node.serial_info.server is None or \
+   node.serial_info.port is None:
+    print "Incomplete serial information for %s" % node.label
+    sys.exit(1)
+
+if safe_mode and not node.is_owner():
+    print "Error: %s is owned by %s" % (node.label, node.owner)
+    sys.exit(1)
+
+if force:
+    if not node.is_owner():
+        print "Warning: taking console owned by %s" % node.owner
+
+    try:
+        kicked = node.kick_console()
+    except Exception, e:
+        print "Error taking console for %s: %s" % (node.label, str(e))
+        sys.exit(1)
+
+    if kicked:
+        print "Took console"
+        # console server needs time to allow another connection
+        time.sleep(2)
+
+def execvp(prgm, args):
+    try:
+        os.execvp(prgm, args)
+    except OSError as err:
+        if err.errno == errno.ENOENT:
+            print "'%s' not found! Please make sure it is accessible in your PATH" % prgm
+            sys.exit(1)
+        else:
+            raise
+
+# if we're serial, fork... otherwise not
+if not serial or not os.fork():
+    perm_args = not permanent and ['--noretry', '--noidle'] or []
+    execvp('condemux', sum((['condemux'], perm_args,
+                           [ node.serial_info.server, node.serial_info.port,
+                           str(node.serial_info.rate),
+                           localport ]), []))
+
+if serial:
+    time.sleep(2)
+    execvp('stelnet', ('stelnet', 'localhost', localport))
+
+
+sys.exit(1)
+

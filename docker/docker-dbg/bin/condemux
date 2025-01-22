@@ -1,0 +1,441 @@
+#!/usr/bin/env python2
+"""
+condemux [flags] host port speed [localport [gdbport]]
+  --help       show usage
+  --[no]retry  Retry [or not] on localport bind failures
+  --noidle     Exit if we ever close our last connection
+ host/port can be device/\"unix\" for unix socket connections (virtual nodes)
+ speed can be none for unix sockets or to avoid baud rate negotiation
+ localport defaults to 9091 if unspecified
+"""
+
+import errno
+import getopt
+import sys
+
+conn_retry = True
+no_idle = False
+
+def openport(port, desc):
+	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	sock.setblocking(0)
+	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
+	bound = 0
+	print "listening on port %d for %s" % (port, desc)
+	while not bound:
+		try:
+			sock.bind(("", port))
+			bound = 1
+		except socket.error, val:
+			if conn_retry and errno.EADDRINUSE == val[0] :
+				print val[1], ":  trying again..."
+				time.sleep(5)
+			else:
+				raise socket.error, val
+	sock.listen(3)
+	return sock
+
+
+
+def debug(data):
+	return
+	print data
+
+# XXX use struct.pack
+def netbytestring(val):
+	return ("%c" % ((val & 0xff000000) >> 24) +
+		"%c" % ((val & 0x00ff0000) >> 16) +
+		"%c" % ((val & 0x0000ff00) >>  8) +
+		"%c" % ((val & 0x000000ff) >>  0));
+
+
+def dobaudrate (file, speed) :
+	if speed:
+		file.send("\xff\xfa,\x01" + netbytestring(speed) + "\xff\xf0")
+
+def readorempty (file) :
+	global socket
+	try:
+		data=file.recv(8192)
+		debug (data)
+		return data
+	except socket.error, val:
+		if errno.EAGAIN == val[0]:
+			return ''
+		elif errno.ECONNRESET == val[0]:
+			return ''
+		elif errno.EINVAL == val[0]:
+			return ''
+		else:
+			raise socket.error, val
+
+def verify_chksum (data) :
+	if not data:
+		return False
+	if len(data) < 4:
+		return False
+	if data[0] != "$":
+		return False
+	if data[-3] != "#":
+		return False
+
+	packet = data[1:-3]
+	sum = data[-2:]
+
+	chksum = 0
+	for ch in packet:
+		chksum += ord(ch)
+
+	chksum &= 0xff
+	try:
+		chksum -= int(sum[:2], 16)
+	except:
+		return False
+
+	return chksum == 0
+
+TEL_WILL = chr(251)
+TEL_WONT = chr(252)
+TEL_DO   = chr(253)
+TEL_DONT = chr(254)
+TEL_IAC  = chr(255)
+
+TEL_OPTIONS = [ TEL_WILL, TEL_WONT, TEL_DO, TEL_DONT ]
+TEL_RESPONSES = { TEL_DO: TEL_WONT, TEL_WILL: TEL_DONT }
+
+def telnet_filter(data):
+
+	if not data:
+		return (None, None)
+
+	if hasattr(telnet_filter, "pending"):
+		#print "pending: ", [hex(ord(x)) for x in telnet_filter.pending]
+		data = telnet_filter.pending + data
+		delattr(telnet_filter, "pending")
+
+	if TEL_IAC not in data:
+		return (None, data)
+
+	filtered = ""
+	responses = ""
+	loc = data.find(TEL_IAC)
+	while loc >= 0:
+		filtered += data[:loc]
+		data = data[loc+1:]
+		if len(data) == 0:
+			telnet_filter.pending = TEL_IAC
+			break
+		cmd = data[0]
+		data = data[1:]
+		#print hex(ord(cmd))
+		if cmd == TEL_IAC:
+			filtered += TEL_IAC
+		elif cmd not in TEL_OPTIONS:
+			pass
+		else:
+			if len(data) == 0:
+				telnet_filter.pending = TEL_IAC + cmd
+				break
+			opt = data[0]
+			data = data[1:]
+			#print hex(ord(opt))
+			if cmd in TEL_RESPONSES:
+				responses += TEL_IAC + TEL_RESPONSES[cmd] + opt
+		loc = data.find(TEL_IAC)
+
+	return (responses or None, filtered)
+
+def accumulate_data (data) :
+	global targetdata
+	global gdb_sent_packet
+	if not data:
+		return (None, None)
+	telnetdata=""
+	gdbdata=""
+	targetdata += data
+#	print "original: " + targetdata
+	fields=string.split(targetdata, "$")
+	# this next bit is kind of cheap, but it shouldn't fail if a
+	# connection is already established with gdb
+	if gdb_sent_packet and fields[0]:
+		gdbdata += fields[0][0]
+		telnetdata += fields[0][1:]
+		# consider this the response
+		gdb_sent_packet=0
+	else:
+		telnetdata += fields[0]
+	incomplete=""
+	for field in fields[1:] :
+		if incomplete:
+			telnetdata += incomplete
+		incomplete = "$" + field
+		endpos=0
+		for ch in field:
+			if "#" == ch:
+				endpos = endpos + 1
+				if len(field) >= endpos + 2:
+					tmpgdb = "$" + field[:endpos+2]
+					if verify_chksum(tmpgdb):
+						gdbdata += tmpgdb
+					else:
+						#print "inval chksum : " + tmpgdb
+						telnetdata += tmpgdb
+					telnetdata += field[endpos+2:]
+					incomplete = ""
+					break
+				else:
+					incomplete="$" + field
+					break
+			elif not (ord(ch) >= 31 and ord(ch) <= 126):
+				telnetdata += "$" + field
+				incomplete = ""
+				break
+			elif endpos > 100000:
+				telnetdata += "$" + field
+				incomplete = ""
+				break	
+			else:
+				endpos = endpos + 1
+		# we didn't reach a terminator... if we are the last packet, this is
+		# ok, but otherwise not...
+	targetdata = incomplete
+	#print "telnet gets : " + telnetdata
+	#print "gdb    gets : " + gdbdata
+	return telnetdata, gdbdata
+
+
+def port_number (port) :
+	try:
+		return string.atoi(port)
+	except:
+		return socket.getservbyname(port, "tcp")
+
+
+def usage(msg = None):
+        print "Usage:", __doc__
+        if msg != None:
+                print "%s" % msg
+        sys.exit(1)
+
+try:
+        opts, args = getopt.getopt(sys.argv[1:], "hrni",
+                                   [ "help", "retry", "noretry", "noidle" ])
+except getopt.error, msg:
+        usage(msg)
+
+if not opts and not args:
+        usage()
+
+for o, a in opts:
+        if o in ("-h", "--help"):
+                usage()
+        elif o in ("-r", "--retry"):
+                conn_retry = True
+        elif o in ("-n", "--noretry"):
+                conn_retry = False
+        elif o in ("-i", "--noidle"):
+                no_idle = True
+        else:
+                usage("Unrecognized option")
+
+if len(args) > 5 or len(args) < 3:
+        usage("Incorrect number of arguments")
+if (len(args) == 5):
+	(host, port, speed, localport, gdbport) = args
+else:
+        gdbport = None
+        if (len(args) == 4):
+                (host, port, speed, localport) = args
+        else:
+                localport = "9091"
+                (host, port, speed) = args
+
+import socket, select, os, string, time
+if port != "unix":
+	port = port_number(port)
+if speed != "none":
+	speed = string.atoi(speed)
+else:
+	speed = None
+localport = port_number(localport)
+telnetport = localport
+if not gdbport:
+	gdbport = localport + 1
+else:
+	gdbport = port_number(gdbport);
+
+targetsock = None
+
+gdb_listener_sock = openport(gdbport, "gdb")
+gdb_sockets = []
+
+telnet_listener_sock = openport(telnetport, "telnet")
+telnet_sockets = []
+
+targetdata=""
+inpacket=0
+
+gdb_sent_packet = 0
+
+lastuserdata = ""
+
+def socketsend(s, data):
+	while True:
+		try:
+			s.sendall(data)
+			break
+		except socket.error, val:
+			if errno.EAGAIN != val[0]:
+				raise socket.error, val
+
+def lattest():
+	def fan_out(data):
+		for socket_ in telnet_sockets:
+			try:
+				socketsend(socket_, data)
+			except:
+				pass
+	
+	import time
+	chrstring = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuv"
+	total = 0
+	failed = 0
+
+	# flush out pending input
+	time.sleep(1)
+	r, w, e = select.select([targetsock], [], [], 1)
+	if r:
+		targetsock.recv(8192)
+	
+	for chr in chrstring:
+		targetsock.send(chr)
+		start= time.time()
+		r, w, e = select.select([targetsock], [], [], 1)
+		if not r:
+			fan_out("rtt exceeded 1 sec!")
+			failed = 1
+			break
+		data = targetsock.recv(8192)
+		end = time.time()
+		if data != chr:
+			fan_out("latency test failed (got %s, expected %s)" % (
+				data, chr))
+			failed = 1
+			break
+		total = total + end - start
+	if not failed:
+		fan_out("   %d roundtrips in %f seconds (latency = %f msec)" % \
+			(len(chrstring), total, total / len(chrstring) * 1000))
+
+
+
+while 1:
+	readers=[]
+	if not targetsock:
+		try:
+			if port != "unix":
+				targetsock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+				targetsock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1);
+				targetsock.connect((host, port))
+				targetsock.setblocking(0)
+				dobaudrate(targetsock, speed)
+			else:
+				targetsock=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+				targetsock.connect(host)
+				targetsock.setblocking(0)
+				dobaudrate(targetsock, speed)
+
+		except socket.error, val:
+			# just get a new socket
+			print "(%s) waiting for %s:%d to come back up" % \
+			    (os.strerror(val[0]), host, port == "unix" and -1 or port)
+			if targetsock:
+				targetsock.close()
+				targetsock = None
+			time.sleep(5)
+			continue
+
+	readers.append(targetsock)
+
+	readers.append(gdb_listener_sock)
+	readers = readers + gdb_sockets
+
+	readers.append(telnet_listener_sock)
+	readers = readers + telnet_sockets
+
+	# if we have an unhandled gdb packet, timeout quickly and close the non-packet
+	if targetdata:
+		timeout = .2
+	else:
+		timeout = None
+	
+	(readers, writers, exceptions) = select.select(readers, [], [], timeout)
+	# expiration case...
+	if not readers:
+		if targetdata:
+			# just push out the target data
+			for socket_ in telnet_sockets:
+				socketsend(socket_, targetdata)
+			targetdata = ""
+		continue
+		
+	
+	for reader in readers:
+		if reader in gdb_sockets or reader in telnet_sockets:
+			data = readorempty(reader)
+			if not data:
+				if reader in gdb_sockets:
+					gdb_sockets.remove(reader)
+				if reader in telnet_sockets:
+					telnet_sockets.remove(reader)
+                                if no_idle and len(gdb_sockets) == 0 and \
+                                   len(telnet_sockets) == 0:
+                                        sys.exit(0)
+			else:
+				lastuserdata = lastuserdata + data
+				if string.find(lastuserdata, "!!lattest") != -1:
+					lattest()
+					lastuserdata=""
+				lastuserdata = lastuserdata[-10:]
+
+				while data:
+					if reader in gdb_sockets and data != "+" and data != "-":
+						gdb_sent_packet=1
+					socketsend(targetsock, data)
+					data=readorempty(reader)
+			
+		elif targetsock == reader:
+			(telnet_options, muxed_data) = telnet_filter(readorempty(targetsock))
+			eof = (telnet_options == None) and (muxed_data == None)
+			(telnetdata, gdbdata) = accumulate_data(muxed_data)
+			if eof:
+				debug("Concentrator disconnected")
+				targetsock = None
+				break
+			else:
+				while not eof:
+					#print "gdbdata: ", gdbdata
+					if telnet_options:
+						#print "telnet options: ", [ hex(ord(x)) for x in telnet_options ]
+						socketsend(targetsock, telnet_options)
+					if gdbdata:
+						for socket_ in gdb_sockets:
+							socketsend(socket_, gdbdata)
+					if telnetdata:
+						for socket_ in telnet_sockets:
+							socketsend(socket_, telnetdata)
+					(telnet_options, muxed_data) = telnet_filter(readorempty(targetsock))
+					eof = (telnet_options == None) and (muxed_data == None)
+					(telnetdata, gdbdata) = accumulate_data(muxed_data)
+
+		elif gdb_listener_sock == reader:
+			newsock=reader.accept()[0]
+			newsock.setblocking(0)
+			newsock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
+			gdb_sockets.append(newsock)
+
+		elif telnet_listener_sock == reader:
+			newsock=reader.accept()[0]
+			newsock.setblocking(0)
+			newsock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
+			telnet_sockets.append(newsock)

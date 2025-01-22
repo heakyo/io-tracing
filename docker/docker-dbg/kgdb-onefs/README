@@ -1,0 +1,12 @@
+# run the command
+./startup.sh B_MAIN_3923_DBG_001
+
+# We neet to run the commands below after running the script startup.sh
+docker cp /root/mma/repo/isi-repo/io-tracing/debug/common/gdbinit kgdb-onefs:/root/.gdbinit
+docker exec -it kgdb-onefs bash
+
+# In docker
+isi_kgdb -q
+
+# In isi_kgdb
+set substitute-path /b/mnt /tmp/isilon_mnt

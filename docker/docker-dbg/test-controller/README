@@ -1,0 +1,40 @@
+#reference link
+#1. Local (Shanghai Lab) Automation Test Setup Guide
+https://confluence.cec.lab.emc.com/display/~zhanga28/Local+%28Shanghai+Lab%29+Automation+Test+Setup+Guide
+
+#2. Setup QA env with new artifactory
+https://confluence.cec.lab.emc.com/display/~Yan_Pan/Setup+QA+env+with+new+artifactory
+
+# check the latest version of the test-controller
+cat ~/.netrc
+---------------------------
+machine pscale.artifactory.cec.lab.emc.com
+login mam28
+password cmVmdGtuOjAxOjE3NjA1OTM4MzE6OGJnd1VNOGhpTTZqSmFSTUJBUVhUWUNiR1dE
+
+./artifactory-docker-image.py latest test-controller
+---------------------------
+5.0.31
+
+# If you do not login the system with the root, docker login first with the current user
+# This step is very important, or you will not run the ./startup command
+# successfully
+docker login pscale.artifactory.cec.lab.emc.com
+# enter the user name and password(token)
+
+# Run the command
+./startup.sh B_MAIN_3923_DBG_001
+
+# connect the target server with en-condebox
+/root/bin/en-condebox 10.124.115.31:7031 9800
+
+# optional
+# set /etc/fstab
+mkdir /mnt/qalogserver_cn
+echo "10.124.114.70:/share /mnt/qalogserver_cn nfs rw,tcp,intr,vers=3,bg 0 0" >> /etc/fstab
+mount /mnt/qalogserver_cn
+df -Th /mnt/qalogserver_cn
+------------------------------------------------------------------------------------------------
+Filesystem           Type  Size  Used Avail Use% Mounted on
+10.124.114.70:/share nfs   422T  1.5T  398T   1% /mnt/qalogserver_cn
+
