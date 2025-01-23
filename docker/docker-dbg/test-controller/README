@@ -25,6 +25,12 @@ docker login pscale.artifactory.cec.lab.emc.com
 # Run the command
 ./startup.sh B_MAIN_3923_DBG_001
 
+# Login to the docker
+docker exec -it container-id bash
+
+# Logout the docker
+Ctrl + D
+
 # connect the target server with en-condebox
 /root/bin/en-condebox 10.124.115.31:7031 9800
 
