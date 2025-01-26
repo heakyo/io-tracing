@@ -22,7 +22,7 @@ define tgt_conn
 	#target remote localhost:9801
 	#target remote localhost:1801
 	#target remote localhost:2801
-	target remote 172.17.0.4:9801
+	target remote 172.17.0.1:9801
 	printf "connected ..... \n"
 end
 
