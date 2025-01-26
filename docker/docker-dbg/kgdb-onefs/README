@@ -10,3 +10,9 @@ isi_kgdb -q
 
 # In isi_kgdb
 set substitute-path /b/mnt /tmp/isilon_mnt
+
+# In dev environment
+# marvin@mlk-client-vm-06
+ssh marvin@10.124.114.232
+# isi-kgdb docker is on 10.124.114.97
+sudo scp /home/marvin/isilon/isi-src/obj/root/isilon_mnt/src/amd64.amd64/sys/modules/idxd/idxd.ko.full root@10.124.114.97:/root/docker/docker-dbg/kgdb-onefs/symbols/idxd.ko
