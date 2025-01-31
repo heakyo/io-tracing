@@ -2,6 +2,9 @@
 
 int main(int argc, char *args[])
 {
-	printf("Real Hello Worlkd\n");
+	printf("Real Hello World\n");
+
+	getchar();
+
 	return 0;
 }
