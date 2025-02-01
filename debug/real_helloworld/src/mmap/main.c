@@ -21,14 +21,14 @@ void mmap_test()
 	ret = fstat(fd, &statbuf);
 	assert(ret != -1);
 
-	getchar();
+	//getchar();
 
 	filesize = statbuf.st_size;
 	printf("memory map %s\n", TEST_FILE);
 	mapped_region = mmap(NULL, filesize, PROT_READ, MAP_PRIVATE, fd, 0);
 	assert(mapped_region != MAP_FAILED);
 
-	getchar();
+	//getchar();
 
 	printf("memory unmap %s\n", TEST_FILE);
 	ret = munmap(mapped_region, filesize);
@@ -43,7 +43,7 @@ int main(int argc, char *args[])
 
 	mmap_test();
 
-	getchar();
+	//getchar();
 
 	return 0;
 }
