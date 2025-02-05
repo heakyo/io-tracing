@@ -5,7 +5,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#define TEST_FILE "data8k"
+#define TEST_FILE "gm0_mnt/data8k"
 
 void mmap_test()
 {

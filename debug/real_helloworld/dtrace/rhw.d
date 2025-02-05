@@ -80,15 +80,41 @@ cache_lookup:entry
 {
 	this->dvp = args[0];
 
-	printf("dvp:v_tag:%s v_type:%d",
+	this->inode = (struct inode *)this->dvp->v_data;
+
+	printf("dvp(%p):v_tag:%s v_type:%d", this->dvp,
 		stringof(this->dvp->v_tag),
-		this->dvp->v_type);
+		this->dvp->v_type
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("inode:i_vnode:%p i_number:%d",
+		this->inode->i_vnode,
+		this->inode->i_number
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->din2 = this->inode->dinode_u.din2;
+	printf("din2:di_blksize:%d",
+		this->din2->di_size
+		);
 }
 
 ufs_lookup_ino:entry
 /execname == proc/
 {
+	this->vdp = args[0];
+	this->vpp = args[1];
+	this->cnp = args[2];
+	this->dd_ino = args[3];
 
+	printf("dd_ino:%p", this->dd_ino);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("cnp:cn_nameptr:%s cn_nameptr:%s",
+		stringof(this->cnp->cn_pnbuf),
+		stringof(this->cnp->cn_nameptr)
+		);
 }
 
 ffs_blkatoff:entry
@@ -99,7 +125,26 @@ ffs_blkatoff:entry
 	printf("bpp:0x%p(v:%p)", this->bpp, *this->bpp);
 }
 
+breadn_flags:entry
+/execname == proc/
+{
+	this->vp = args[0];
+	this->blkno = args[1];
+	this->size = args[2];
+
+	printf("vp:%p blkno:%d size:%d",
+		this->vp,
+		this->blkno,
+		this->size
+		);
+}
+
+
 /*return*************************************************************************************/
+
+breadn_flags:return
+/execname == proc/
+{}
 
 ffs_blkatoff:return
 /execname == proc/
@@ -110,7 +155,7 @@ ffs_blkatoff:return
 	printf("\n\t\t\t\t\t      ");
 
 	this->bp = *this->bpp;
-	this->ep = (struct direct *)((char *)this->bp->b_data + 24);
+	this->ep = (struct direct *)((char *)this->bp->b_data + 0x4C);
 	printf("ep:d_ino:%d d_reclen:%d d_namelen:%d, d_name:%s",
 		this->ep->d_ino,
 		this->ep->d_reclen,
@@ -121,7 +166,8 @@ ffs_blkatoff:return
 ufs_lookup_ino:return
 /execname == proc/
 {
-
+	printf("dd_ino:%p", this->dd_ino);
+	printf("\n\t\t\t\t\t      ");
 }
 
 cache_lookup:return
