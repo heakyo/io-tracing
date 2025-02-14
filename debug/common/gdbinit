@@ -5,29 +5,34 @@
 #
 
 ######################################################
-#    		marvin definition    		     #
+#    		Marvin Custom Commands
 ######################################################
 #set auto-load safe-path /
 set history save on
 set print pretty on
 set print array-indexes on
 set disassemble-next-line off
+
+# To connect to the target which is in DDB
 define tgt_conn
 	printf "Begin connection ..... \n"
 	#set substitute-path /root/isilon_mnt/src /home/marvin/isilon/isi-src/onefs
 	#set substitute-path /b/mnt/src /home/marvin/isilon/isi-src/freebsd/bk-onefs/onefs
+	#set substitute-path /b/mnt /tmp/isilon_mnt --- for isi_kgdb
 	#cd /home/marvin/symbols
 	cd /tmp/symbols
 	file kernel
 	#target remote localhost:9801
-	#target remote localhost:1801
-	#target remote localhost:2801
 	target remote 172.17.0.1:9801
 	printf "connected ..... \n"
 end
 
+define hexdump
+        dump binary memory /tmp/dump.bin $arg0 $arg0+$arg1
+        shell hexdump -C /tmp/dump.bin
+end
 ######################################################
-#    		marvin gold_dust    		     #
+#    		Marvin gold_dust    		     #
 ######################################################
 define gd_show_bh_anchor
 	set $_anchor = bh_anchor
