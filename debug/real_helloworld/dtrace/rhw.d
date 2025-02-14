@@ -110,6 +110,10 @@ cache_lookup:entry
  * gp = pp->geom
  * cp = LIST_FIRST(&gp->consumer)
  */
+	printf("umcp:%p",
+		this->umcp
+		);
+	printf("\n\t\t\t\t\t      ");
 
 	/* VFS */
 	this->vfs_csm = this->umcp;
@@ -168,6 +172,19 @@ cache_lookup:entry
 	);
 	printf("\n\t\t\t\t\t      ");
 
+/************************************************************************/
+	/* CDEV */
+	this->umdev=this->iump->um_dev;
+	this->dev_csm = ((struct g_consumer *)this->umdev->si_drv2);
+	printf("csm:geom:%s \tclass:%s \tpvd:%s \tdrv2:%p(csm)->%p(pvd)",
+		stringof(this->dev_csm->geom->name),
+		stringof(this->dev_csm->geom->class->name),
+		stringof(this->dev_csm->provider->name),
+		this->dev_csm,
+		this->dev_csm->provider
+		);
+
+/************************************************************************/
 	/* md9p1 */
 	if (0) {
 		this->part_pvd2 = this->mirror_csm2->provider;
@@ -179,6 +196,8 @@ cache_lookup:entry
 		);
 		printf("\n\t\t\t\t\t      ");
 	}
+
+/************************************************************************/
 }
 
 ufs_lookup_ino:entry
