@@ -1,0 +1,43 @@
+################################################# How to use a file as a disk on FreeBSD ######################################################
+# 1. Check existing memory disks
+mdconfig -l
+
+# 2. Create a file to be used as a raw disk
+dd if=/dev/zero of=disk.img bs=1M count=100
+
+# 3. Associate the file with a memory disk
+https://man.freebsd.org/cgi/man.cgi?query=mdconfig&apropos=0&sektion=0&manpath=FreeBSD+14.2-RELEASE+and+Ports&arch=default&format=html
+mdconfig -a -t vnode -f disk.img -u 0
+
+# 4. Partition the memory disk
+gpart create -s GPT md0
+gpart add -t freebsd-ufs md0
+
+# 5. Format the memory disk or specific partition
+newfs -U /dev/md0
+or
+newfs -U /dev/md0p1  # Replace p1 with the appropriate partition number if you used gpart
+
+# 6. Mount the file system:
+mkdir /mnt/mydisk
+mount /dev/md0 /mnt/mydisk  # Mount the entire memory disk
+or
+mount /dev/md0p1 /mnt/mydisk  # Mount a specific partition
+
+# 7. Verify
+df -Th /mnt/mydisk
+
+# 8. Unmount and detach the memory disk (when done)
+umount /mnt/mydisk
+mdconfig -d -u 0  # Detach the memory disk
+
+################################################# How to create a mirror using gmirror ######################################################
+# 1. Check the geom mirror module
+kldstat -vn kernel | grep mirror
+
+# 1. Initialize the gmirror
+gmirror label -v gm0 /dev/ada1 /dev/ada2
+
+# 2. Verify the gmirror status
+gmirror status
+
