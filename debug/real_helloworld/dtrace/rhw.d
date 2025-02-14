@@ -122,21 +122,38 @@ cache_lookup:entry
 
 /************************************************************************/
 	/* MIRROR */
+	printf("------------------------------------------------------------------");
+	printf("\n\t\t\t\t\t      ");
 	this->mirror_pvd = this->umcp->provider;
-	printf("pvd:geom:%s \t\tclass:%s \tflags:0x%x",
+	printf("pvd(%p):geom:%s \t\tclass:%s \t\t\tflags:0x%x gp:%p",
+		this->mirror_pvd,
 		stringof(this->mirror_pvd->geom->name),
 		stringof(this->mirror_pvd->geom->class->name),
-		this->mirror_pvd->flags
+		this->mirror_pvd->flags,
+		this->mirror_pvd->geom
 	);
 	printf("\n\t\t\t\t\t      ");
 
 	this->mirror_csm = this->mirror_pvd->geom->consumer.lh_first;
-	printf("csm:geom:%s \t\tclass:%s \tpvd:%s \tflags:0x%x",
+	printf("csm(%p):geom:%s \t\tclass:%s \tpvd:%s \tflags:0x%x gp:%p",
+		this->mirror_csm,
 		stringof(this->mirror_csm->geom->name),
 		stringof(this->mirror_csm->geom->class->name),
 		stringof(this->mirror_csm->provider->name),
-		this->mirror_csm->flags
+		this->mirror_csm->flags,
+		this->mirror_csm->geom
 	);
+	printf("\n\t\t\t\t\t      ");
+
+	this->mirror_geom = this->mirror_pvd->geom;
+	printf("geom:%p \t\t\tclass:%s \tpvdp:%p \tcsmp:%p",
+		this->mirror_geom,
+		stringof(this->mirror_geom->class->name),
+		this->mirror_geom->provider.lh_first,
+		this->mirror_geom->consumer.lh_first
+		);
+	printf("\n\t\t\t\t\t      ");
+	printf("------------------------------------------------------------------");
 	printf("\n\t\t\t\t\t      ");
 
 /************************************************************************/
