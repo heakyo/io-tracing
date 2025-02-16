@@ -7,11 +7,12 @@
 
 #define TEST_FILE "gm0_mnt/data8k"
 
-void mmap_test()
+static void
+mmap_test(void)
 {
 	int fd;
 	struct stat statbuf;
-	void *mapped_region;
+	char *mapped_region;
 	size_t filesize;
 	int ret;
 
@@ -25,11 +26,12 @@ void mmap_test()
 
 	filesize = statbuf.st_size;
 	printf("memory map %s\n", TEST_FILE);
-	mapped_region = mmap(NULL, filesize, PROT_READ, MAP_PRIVATE, fd, 0);
+	mapped_region = (char *)mmap(NULL, filesize, PROT_READ, MAP_PRIVATE, fd, 0);
 	assert(mapped_region != MAP_FAILED);
 
 	//getchar();
 
+	printf("v:%x\n", mapped_region[0]);
 	printf("memory unmap %s\n", TEST_FILE);
 	ret = munmap(mapped_region, filesize);
 	assert(ret != -1);
@@ -37,11 +39,45 @@ void mmap_test()
 	close(fd);
 }
 
-int main(int argc, char *args[])
+static void
+dump_data(unsigned char *buf, unsigned int nbytes)
+{
+	for (int i = 0; i < nbytes; i++) {
+		if (i % 16 == 0) {
+			printf("\n%08x: ", i);
+		}
+		printf("%02x ", buf[i]);
+	}
+
+	printf("\n");
+}
+
+static void
+rw_test(void)
+{
+	int fd;
+	int ret;
+	unsigned char buf[4096];
+
+	fd = open(TEST_FILE, O_RDWR);
+	assert(fd != -1);
+
+	ret = read(fd, buf, sizeof(buf));
+	assert(ret != -1);
+
+	dump_data(buf, 32);
+	//printf("0x0: %x\n", buf[0]);
+
+	close(fd);
+}
+
+int
+main(int argc, char *args[])
 {
 	printf("Real Hello World\n");
 
-	mmap_test();
+	//mmap_test();
+	rw_test();
 
 	//getchar();
 

@@ -15,7 +15,7 @@ clean:
 	rm -rf main main.o $(TEST_FILE)
 
 mkdata:
-	dd if=/dev/urandom of=$(TEST_FILE) bs=8k count=1
+	dd if=/dev/urandom of=$(TEST_FILE) bs=4k count=1
 
 rhwd: main
 	./rhw.d -c './main'

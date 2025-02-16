@@ -266,8 +266,80 @@ ffs_blkatoff:return
 ufs_lookup_ino:return
 /execname == proc/
 {
-	printf("dd_ino:%p", this->dd_ino);
+	this->ret = args[1];
+	this->dd_vp = *this->vpp;
+	this->dd_ip = (struct inode *)this->dd_vp->v_data;
+
+	printf("ret:%d", this->ret);
 	printf("\n\t\t\t\t\t      ");
+
+/********************************* data vnode *************************************/
+	printf("data vnodep:%p tag:%s type:%d",
+		this->dd_vp,
+		stringof(this->dd_vp->v_tag),
+		this->dd_vp->v_type
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/********************************* bufobj *************************************/
+	this->dd_v_bufobj = this->dd_vp->v_bufobj;
+	this->dd_bo_clean = this->dd_v_bufobj.bo_clean;
+	this->dd_bo_dirty = this->dd_v_bufobj.bo_dirty;
+
+	printf("bufobj:bufv:clean:cnt:%d dirty:cnt:%d",
+		this->dd_bo_clean.bv_cnt,
+		this->dd_bo_dirty.bv_cnt
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/********************************* buf *************************************/
+	this->dd_buf = this->dd_bo_dirty.bv_hd.tqh_first;
+	printf("buf: bcount:%d bdata:%p iocmd:%d blkno:%d offset:%d qindex:%d",
+		this->dd_buf->b_bcount,
+		this->dd_buf->b_data,
+		this->dd_buf->b_iocmd,
+		this->dd_buf->b_blkno,
+		this->dd_buf->b_offset,
+		this->dd_buf->b_qindex
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/********************************* vm_object *************************************/
+	this->dd_bo_object = this->dd_v_bufobj.bo_object;
+	printf("vm_object:%p:size:%d rpc:%d",
+		this->dd_bo_object,
+		this->dd_bo_object->size,
+		this->dd_bo_object->resident_page_count
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/********************************* vm_page *************************************/
+	this->vm_page0 = this->dd_bo_object->memq.tqh_first;
+	printf("vm_page(%p):vmobj:%p pindex:%d phys_addr:%p",
+		this->vm_page0,
+		this->vm_page0->object,
+		this->vm_page0->pindex,
+		this->vm_page0->phys_addr
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("vm_page:astate:flags:0x%x queue:%d",
+		this->vm_page0->a.flags,
+		this->vm_page0->a.queue
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/********************************* data inode *************************************/
+	printf("data inodep:%p vnodep:%p",
+		this->dd_ip,
+		this->dd_ip->i_vnode
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("number:%d",
+		this->dd_ip->i_number
+		);
+/*********************************************************************************/
 }
 
 cache_lookup:return
