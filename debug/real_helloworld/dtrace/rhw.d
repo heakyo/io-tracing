@@ -237,14 +237,61 @@ breadn_flags:entry
 		this->blkno,
 		this->size
 		);
+	printf("\n\t\t\t\t\t      ");
+
+/********************************* vm_page *************************************/
+	this->vm_page0 = this->vp->v_bufobj.bo_object->memq.tqh_first;
+	printf("vm_page(%p):vmobj:%p pindex:%d phys_addr:%p",
+		this->vm_page0,
+		this->vm_page0->object,
+		this->vm_page0->pindex,
+		this->vm_page0->phys_addr
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("vm_page:astate:flags:0x%x queue:%d",
+		this->vm_page0->a.flags,
+		this->vm_page0->a.queue
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	/*stack();*/
+
 }
 
+/*------------------------------------------------------------------------------------------*/
+sys_read:entry
+/execname == proc/
+{
+
+}
 
 /*return*************************************************************************************/
+sys_read:return
+/execname == proc/
+{
+
+}
+
+/*------------------------------------------------------------------------------------------*/
 
 breadn_flags:return
 /execname == proc/
-{}
+{
+	printf("vm_page(%p):vmobj:%p pindex:%d phys_addr:%p",
+		this->vm_page0,
+		this->vm_page0->object,
+		this->vm_page0->pindex,
+		this->vm_page0->phys_addr
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("vm_page:astate:flags:0x%x queue:%d",
+		this->vm_page0->a.flags,
+		this->vm_page0->a.queue
+		);
+	printf("\n\t\t\t\t\t      ");
+}
 
 ffs_blkatoff:return
 /execname == proc/
