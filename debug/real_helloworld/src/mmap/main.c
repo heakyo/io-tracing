@@ -7,6 +7,8 @@
 
 #define TEST_FILE "gm0_mnt/data8k"
 
+unsigned char a[4096] = {0x55};
+
 static void
 mmap_test(void)
 {
@@ -57,7 +59,7 @@ rw_test(void)
 {
 	int fd;
 	int ret;
-	unsigned char buf[4096];
+	unsigned char buf[8192];
 
 	fd = open(TEST_FILE, O_RDWR);
 	assert(fd != -1);
@@ -79,7 +81,7 @@ main(int argc, char *args[])
 	//mmap_test();
 	rw_test();
 
-	//getchar();
+	getchar();
 
 	return 0;
 }

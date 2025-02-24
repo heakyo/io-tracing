@@ -239,6 +239,10 @@ breadn_flags:entry
 		);
 	printf("\n\t\t\t\t\t      ");
 
+	printf("inode:number:%d",
+		((struct inode *)this->vp->v_data)->i_number);
+	printf("\n\t\t\t\t\t      ");
+
 /********************************* vm_page *************************************/
 	this->vm_page0 = this->vp->v_bufobj.bo_object->memq.tqh_first;
 	printf("vm_page(%p):vmobj:%p pindex:%d phys_addr:%p",
@@ -256,21 +260,120 @@ breadn_flags:entry
 	printf("\n\t\t\t\t\t      ");
 
 	/*stack();*/
-
 }
 
 /*------------------------------------------------------------------------------------------*/
 sys_read:entry
 /execname == proc/
 {
+}
 
+kern_readv:entry
+/execname == proc/
+{
+/*https://man.freebsd.org/cgi/man.cgi?query=vnode&apropos=0&sektion=0&manpath=FreeBSD+14.2-RELEASE+and+Ports&arch=default&format=html*/
+	this->td = args[0];
+
+	printf("td:%p name:%s proc:%p",
+		this->td,
+		this->td->td_name,
+		this->td->td_proc
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->proc = this->td->td_proc;
+	printf("proc:name:%s pid:%d",
+		this->proc->p_comm,
+		this->proc->p_pid
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->ptextvp = this->proc->p_textvp;
+	this->pvmspace = this->proc->p_vmspace;
+
+/************************************* vnode ***************************************/
+	printf("textvp(%p):tag:%s type:%d",
+		this->ptextvp,
+		stringof(this->ptextvp->v_tag),
+		this->ptextvp->v_type
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/************************************* inode ***************************************/
+	this->inode = (struct inode*)this->ptextvp->v_data;
+	printf("inode:number:%d vnode:%p",
+		this->inode->i_number,
+		this->inode->i_vnode
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/************************************* ufsmount ***************************************/
+	this->iump = this->inode->i_ump;
+	this->um_bo = this->iump->um_bo;
+	printf("ufsmount:bo:%p bo_ops:%p goem name:%s",
+		this->iump->um_bo,
+		this->iump->um_bo->bo_ops,
+		stringof(((struct g_consumer*)this->iump->um_bo->bo_private)->geom->name)
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/************************************* bufobj ***************************************/
+	this->vbufobj = this->ptextvp->v_bufobj;
+
+	printf("bufobj:private:%p(vp) bsize:%d ops:%p bv_cnt:(d:%d c:%d)",
+		this->vbufobj.bo_private,
+		this->vbufobj.bo_bsize,
+		this->vbufobj.bo_ops,
+		this->vbufobj.bo_dirty.bv_cnt,
+		this->vbufobj.bo_clean.bv_cnt
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/************************************* bufv ***************************************/
+	this->bodirty =  this->vbufobj.bo_dirty;
+	this->buf0 = this->bodirty.bv_hd.tqh_first;
+	this->buf1 = this->buf0->b_bobufs.tqe_next;
+	this->buf2 = this->buf1->b_bobufs.tqe_next;
+	printf("bufv:cnt:%d buf0:%p buf1:%p",
+		this->bodirty.bv_cnt,
+		this->buf0,
+		this->buf1
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/************************************* buf0 ***************************************/
+	printf("buf0:bufobj:%p qindex:%d count:%d",
+		this->buf0->b_bufobj,
+		this->buf0->b_qindex,
+		this->buf0->b_bcount
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/************************************* buf1 ***************************************/
+	printf("buf1:bufobj:%p qindex:%d count:%d",
+		this->buf1->b_bufobj,
+		this->buf1->b_qindex,
+		this->buf1->b_bcount
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/************************************* vm_obj ***************************************/
+	this->bobject = this->vbufobj.bo_object;
+
+	printf("vmobject:size:%d",
+		this->bobject->size
+		);
 }
 
 /*return*************************************************************************************/
+kern_readv:return
+/execname == proc/
+{
+}
+
 sys_read:return
 /execname == proc/
 {
-
 }
 
 /*------------------------------------------------------------------------------------------*/
@@ -321,10 +424,11 @@ ufs_lookup_ino:return
 	printf("\n\t\t\t\t\t      ");
 
 /********************************* data vnode *************************************/
-	printf("data vnodep:%p tag:%s type:%d",
+	printf("data vnodep:%p tag:%s type:%d cachedd:%p",
 		this->dd_vp,
 		stringof(this->dd_vp->v_tag),
-		this->dd_vp->v_type
+		this->dd_vp->v_type,
+		this->dd_vp->v_cache_dd
 		);
 	printf("\n\t\t\t\t\t      ");
 
