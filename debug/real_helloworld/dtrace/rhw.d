@@ -331,29 +331,44 @@ kern_readv:entry
 
 /************************************* bufv ***************************************/
 	this->bodirty =  this->vbufobj.bo_dirty;
+	this->boclean =  this->vbufobj.bo_clean;
+
 	this->buf0 = this->bodirty.bv_hd.tqh_first;
 	this->buf1 = this->buf0->b_bobufs.tqe_next;
 	this->buf2 = this->buf1->b_bobufs.tqe_next;
-	printf("bufv:cnt:%d buf0:%p buf1:%p",
+
+	printf("dirty bufv:cnt:%d buf0:%p buf1:%p buf2:%p",
 		this->bodirty.bv_cnt,
 		this->buf0,
-		this->buf1
+		this->buf1,
+		this->buf2
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("clean bufv:cnt:%d",
+		this->boclean.bv_cnt
 		);
 	printf("\n\t\t\t\t\t      ");
 
 /************************************* buf0 ***************************************/
-	printf("buf0:bufobj:%p qindex:%d count:%d",
+	printf("buf0:bufobj:%p qindex:%d count:%d offset:%d blkno:%d npages:%d",
 		this->buf0->b_bufobj,
 		this->buf0->b_qindex,
-		this->buf0->b_bcount
+		this->buf0->b_bcount,
+		this->buf0->b_offset,
+		this->buf0->b_blkno,
+		this->buf0->b_npages
 		);
 	printf("\n\t\t\t\t\t      ");
 
 /************************************* buf1 ***************************************/
-	printf("buf1:bufobj:%p qindex:%d count:%d",
+	printf("buf1:bufobj:%p qindex:%d count:%d offset:%d blkno:%d npages:%d",
 		this->buf1->b_bufobj,
 		this->buf1->b_qindex,
-		this->buf1->b_bcount
+		this->buf1->b_bcount,
+		this->buf1->b_offset,
+		this->buf1->b_blkno,
+		this->buf0->b_npages
 		);
 	printf("\n\t\t\t\t\t      ");
 
@@ -363,6 +378,42 @@ kern_readv:entry
 	printf("vmobject:size:%d",
 		this->bobject->size
 		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->memq = this->bobject->memq;
+	this->vmpg0 = this->memq.tqh_first;
+	this->vmpg1 = this->vmpg0->listq.tqe_next;
+	this->vmpg2 = this->vmpg1->listq.tqe_next;
+	this->vmpg3 = this->vmpg2->listq.tqe_next;
+	this->vmpg4 = this->vmpg3->listq.tqe_next;
+	this->vmpg5 = this->vmpg4->listq.tqe_next;
+	this->vmpg6 = this->vmpg5->listq.tqe_next;
+	this->vmpg7 = this->vmpg6->listq.tqe_next;
+
+	printf("memq:vmpg:0:%p 1:%p 2:%p 3:%p 4:%p 5:%p 6:%p 7:%p",
+		this->vmpg0,
+		this->vmpg1,
+		this->vmpg2,
+		this->vmpg3,
+		this->vmpg4,
+		this->vmpg5,
+		this->vmpg6,
+		this->vmpg7
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("vmpg0:pindex:%d flags:%x",
+		this->vmpg0->pindex,
+		this->vmpg0->flags
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("vmpg1:pindex:%d flags:%x",
+		this->vmpg1->pindex,
+		this->vmpg1->flags
+		);
+	printf("\n\t\t\t\t\t      ");
+
 }
 
 /*return*************************************************************************************/

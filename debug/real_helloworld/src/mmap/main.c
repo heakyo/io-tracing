@@ -7,7 +7,8 @@
 
 #define TEST_FILE "gm0_mnt/data8k"
 
-unsigned char a[4096] = {0x55};
+//unsigned char a[4096] = {0x55};
+unsigned char a[4096];
 
 static void
 mmap_test(void)
