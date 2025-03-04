@@ -360,6 +360,11 @@ kern_readv:entry
 		this->buf0->b_npages
 		);
 	printf("\n\t\t\t\t\t      ");
+	printf("buf0:data:%p",
+		this->buf0->b_data
+		);
+	printf("\n\t\t\t\t\t      ");
+	/*trace(copyinstr((uintptr_t)this->buf0->b_data));*/
 
 /************************************* buf1 ***************************************/
 	printf("buf1:bufobj:%p qindex:%d count:%d offset:%d blkno:%d npages:%d",
@@ -390,11 +395,15 @@ kern_readv:entry
 	this->vmpg6 = this->vmpg5->listq.tqe_next;
 	this->vmpg7 = this->vmpg6->listq.tqe_next;
 
-	printf("memq:vmpg:0:%p 1:%p 2:%p 3:%p 4:%p 5:%p 6:%p 7:%p",
+	printf("memq:vmpg:0:%p 1:%p 2:%p 3:%p",
 		this->vmpg0,
 		this->vmpg1,
 		this->vmpg2,
-		this->vmpg3,
+		this->vmpg3
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("memq:vmpg:4:%p 5:%p 6:%p 7:%p",
 		this->vmpg4,
 		this->vmpg5,
 		this->vmpg6,
@@ -416,7 +425,17 @@ kern_readv:entry
 
 }
 
+vn_read:entry
+/execname == proc/
+{
+}
+
 /*return*************************************************************************************/
+vn_read:return
+/execname == proc/
+{
+}
+
 kern_readv:return
 /execname == proc/
 {
