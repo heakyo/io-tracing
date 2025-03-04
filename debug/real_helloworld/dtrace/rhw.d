@@ -42,7 +42,66 @@ vfs_cache_lookup:return
 /execname == proc/
 {}
 
+/*VOP**********************************************************************************************************/
 VOP_CACHEDLOOKUP_APV:*
+/execname == proc/
+{}
+
+VOP_UNLOCKED_READ_APV:entry
+/execname == proc/
+{
+	this->vop = args[0];
+
+	printf("vop(%p):unlocked_read:%p bypass:%p default:%p",
+		this->vop,
+		this->vop->vop_unlocked_read,
+		this->vop->vop_bypass,
+		this->vop->vop_default
+	);
+	func((uintptr_t)this->vop);
+	printf("\n\t\t\t\t\t      ");
+
+	this->vop = this->vop->vop_default;
+	printf("vop(%p):unlocked_read:%p bypass:%p default:%p",
+		this->vop,
+		this->vop->vop_unlocked_read,
+		this->vop->vop_bypass,
+		this->vop->vop_default
+	);
+	func((uintptr_t)this->vop);
+	printf("\n\t\t\t\t\t      ");
+
+	this->vop = this->vop->vop_default;
+	printf("vop(%p):unlocked_read:%p bypass:%p default:%p",
+		this->vop,
+		this->vop->vop_unlocked_read,
+		this->vop->vop_bypass,
+		this->vop->vop_default
+	);
+	func((uintptr_t)this->vop);
+	printf("\n\t\t\t\t\t      ");
+}
+
+VOP_READ_APV:entry
+/execname == proc/
+{
+	this->vop = args[0];
+
+	printf("vop(%p):read:%p bypass:%p default:%p",
+		this->vop,
+		this->vop->vop_read,
+		this->vop->vop_bypass,
+		this->vop->vop_default
+	);
+	func((uintptr_t)this->vop);
+	printf("\n\t\t\t\t\t      ");
+}
+
+VOP_READ_APV:return
+/execname == proc/
+{}
+
+VOP_UNLOCKED_READ_APV:return
 /execname == proc/
 {}
 
@@ -430,7 +489,73 @@ vn_read:entry
 {
 }
 
+ffs_read:entry
+/execname == proc/
+{
+	this->ap = args[0];
+
+	this->vp = this->ap->a_vp;
+
+/************************************* inode ***************************************/
+	this->inode = (struct inode*)this->vp->v_data;
+	printf("inode:number:%d vnode:%p",
+		this->inode->i_number,
+		this->inode->i_vnode
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/************************************* bufobj ***************************************/
+	this->vbufobj = this->vp->v_bufobj;
+	printf("bufobj:private:%p(vp) bsize:%d ops:%p bv_cnt:(d:%d c:%d)",
+		this->vbufobj.bo_private,
+		this->vbufobj.bo_bsize,
+		this->vbufobj.bo_ops,
+		this->vbufobj.bo_dirty.bv_cnt,
+		this->vbufobj.bo_clean.bv_cnt
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/************************************* bufv ***************************************/
+	this->bodirty =  this->vbufobj.bo_dirty;
+	this->boclean =  this->vbufobj.bo_clean;
+
+	this->buf0 = this->bodirty.bv_hd.tqh_first;
+	this->buf1 = this->buf0->b_bobufs.tqe_next;
+
+	printf("dirty bufv:cnt:%d buf0:%p buf1:%p",
+		this->bodirty.bv_cnt,
+		this->buf0,
+		this->buf1
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("clean bufv:cnt:%d",
+		this->boclean.bv_cnt
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/************************************* buf0 ***************************************/
+	printf("buf0:bufobj:%p qindex:%d count:%d offset:%d blkno:%d npages:%d",
+		this->buf0->b_bufobj,
+		this->buf0->b_qindex,
+		this->buf0->b_bcount,
+		this->buf0->b_offset,
+		this->buf0->b_blkno,
+		this->buf0->b_npages
+		);
+	printf("\n\t\t\t\t\t      ");
+	printf("buf0:data:%p",
+		this->buf0->b_data
+		);
+	printf("\n\t\t\t\t\t      ");
+}
+
 /*return*************************************************************************************/
+ffs_read:return
+/execname == proc/
+{
+}
+
 vn_read:return
 /execname == proc/
 {
