@@ -1,10 +1,11 @@
 CC = cc
-CFLAGS = -Wall -g0 -O0
+CFLAGS = -g0 -O0
 TEST_FILE=./gm0_mnt/data8k
 
 all: main
 
-main: main.o mkdata
+#main: main.o mkdata
+main: main.o
 	$(CC) $(CFLAGS) -o $@ main.o
 
 main.o:main.c

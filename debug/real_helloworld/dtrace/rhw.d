@@ -42,6 +42,31 @@ vfs_cache_lookup:return
 /execname == proc/
 {}
 
+vn_io_fault_doio:entry
+/execname == proc/
+{
+	this->args = args[0];
+
+	/*
+	 * vfs_vnops.c
+	 * 0:VN_IO_FAULT_FOP  1:VN_IO_FAULT_VOP
+	 */
+	printf("args:kind:%d",
+		this->args->kind
+		);
+}
+
+vn_io_fault_doio:return
+/execname == proc/
+{
+}
+
+cluster_read:*
+/execname == proc/
+{
+	stack();
+}
+
 /*VOP**********************************************************************************************************/
 VOP_CACHEDLOOKUP_APV:*
 /execname == proc/
@@ -284,6 +309,14 @@ ffs_blkatoff:entry
 	printf("bpp:0x%p(v:%p)", this->bpp, *this->bpp);
 }
 
+breada:entry
+/execname == proc/
+{}
+
+bstrategy:entry
+/execname == proc/
+{}
+
 breadn_flags:entry
 /execname == proc/
 {
@@ -319,6 +352,26 @@ breadn_flags:entry
 	printf("\n\t\t\t\t\t      ");
 
 	/*stack();*/
+}
+
+getblkx:entry
+/execname == proc/
+{
+	this->bpp = args[6];
+
+	printf("bpp:%p",
+		this->bpp
+		);
+}
+
+getblk_core:entry
+/execname == proc/
+{
+}
+
+gbincore_unlocked:entry
+/execname == proc/
+{
 }
 
 /*------------------------------------------------------------------------------------------*/
@@ -391,6 +444,7 @@ kern_readv:entry
 /************************************* bufv ***************************************/
 	this->bodirty =  this->vbufobj.bo_dirty;
 	this->boclean =  this->vbufobj.bo_clean;
+/*
 
 	this->buf0 = this->bodirty.bv_hd.tqh_first;
 	this->buf1 = this->buf0->b_bobufs.tqe_next;
@@ -408,8 +462,10 @@ kern_readv:entry
 		this->boclean.bv_cnt
 		);
 	printf("\n\t\t\t\t\t      ");
+*/
 
 /************************************* buf0 ***************************************/
+/*
 	printf("buf0:bufobj:%p qindex:%d count:%d offset:%d blkno:%d npages:%d",
 		this->buf0->b_bufobj,
 		this->buf0->b_qindex,
@@ -423,9 +479,11 @@ kern_readv:entry
 		this->buf0->b_data
 		);
 	printf("\n\t\t\t\t\t      ");
+*/
 	/*trace(copyinstr((uintptr_t)this->buf0->b_data));*/
 
 /************************************* buf1 ***************************************/
+/*
 	printf("buf1:bufobj:%p qindex:%d count:%d offset:%d blkno:%d npages:%d",
 		this->buf1->b_bufobj,
 		this->buf1->b_qindex,
@@ -435,6 +493,7 @@ kern_readv:entry
 		this->buf0->b_npages
 		);
 	printf("\n\t\t\t\t\t      ");
+*/
 
 /************************************* vm_obj ***************************************/
 	this->bobject = this->vbufobj.bo_object;
@@ -487,8 +546,15 @@ kern_readv:entry
 vn_read:entry
 /execname == proc/
 {
+	this->fp = args[0];
+
+	printf("fp:type:%d vnode:%p",
+		this->fp->f_type,
+		this->fp->f_vnode
+		);
 }
 
+/*sys/ufs/ffs/ffs_vnops.c*/
 ffs_read:entry
 /execname == proc/
 {
@@ -519,6 +585,7 @@ ffs_read:entry
 	this->bodirty =  this->vbufobj.bo_dirty;
 	this->boclean =  this->vbufobj.bo_clean;
 
+/*
 	this->buf0 = this->bodirty.bv_hd.tqh_first;
 	this->buf1 = this->buf0->b_bobufs.tqe_next;
 
@@ -533,8 +600,10 @@ ffs_read:entry
 		this->boclean.bv_cnt
 		);
 	printf("\n\t\t\t\t\t      ");
+*/
 
 /************************************* buf0 ***************************************/
+/*
 	printf("buf0:bufobj:%p qindex:%d count:%d offset:%d blkno:%d npages:%d",
 		this->buf0->b_bufobj,
 		this->buf0->b_qindex,
@@ -544,16 +613,19 @@ ffs_read:entry
 		this->buf0->b_npages
 		);
 	printf("\n\t\t\t\t\t      ");
-	printf("buf0:data:%p",
-		this->buf0->b_data
-		);
-	printf("\n\t\t\t\t\t      ");
+*/
 }
 
 /*return*************************************************************************************/
 ffs_read:return
 /execname == proc/
 {
+/*
+	printf("buf0:data:%p",
+		this->buf0->b_data
+		);
+	printf("\n\t\t\t\t\t      ");
+*/
 }
 
 vn_read:return
@@ -572,10 +644,47 @@ sys_read:return
 }
 
 /*------------------------------------------------------------------------------------------*/
+gbincore_unlocked:return
+/execname == proc/
+{
+	this->ret_bp = args[1];
+
+	printf("ret:%p", this->ret_bp);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("bp:%p data:%p flags:%x",
+		this->ret_bp,
+		this->ret_bp->b_data,
+		this->ret_bp->b_flags
+		);
+	printf("\n\t\t\t\t\t      ");
+}
+
+getblk_core:return
+/execname == proc/
+{
+}
+
+getblkx:return
+/execname == proc/
+{
+	this->ret_bp = *this->bpp;
+
+	printf("ret:%d", args[1]);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("bp:%p data:%p flags:%x",
+		this->ret_bp,
+		this->ret_bp->b_data,
+		this->ret_bp->b_flags
+		);
+	printf("\n\t\t\t\t\t      ");
+}
 
 breadn_flags:return
 /execname == proc/
 {
+/*
 	printf("vm_page(%p):vmobj:%p pindex:%d phys_addr:%p",
 		this->vm_page0,
 		this->vm_page0->object,
@@ -589,7 +698,16 @@ breadn_flags:return
 		this->vm_page0->a.queue
 		);
 	printf("\n\t\t\t\t\t      ");
+*/
 }
+
+breada:return
+/execname == proc/
+{}
+
+bstrategy:return
+/execname == proc/
+{}
 
 ffs_blkatoff:return
 /execname == proc/

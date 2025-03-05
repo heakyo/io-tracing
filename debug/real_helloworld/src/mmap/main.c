@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <assert.h>
@@ -6,6 +7,9 @@
 #include <sys/stat.h>
 
 #define TEST_FILE "gm0_mnt/data8k"
+#define RW_TEST_FILE "gm0_mnt/data_rw8k"
+
+#define BUFSZ 8192
 
 //unsigned char a[4096] = {0x55};
 unsigned char a[4096];
@@ -56,22 +60,49 @@ dump_data(unsigned char *buf, unsigned int nbytes)
 }
 
 static void
-rw_test(void)
+rw_test_create(unsigned char *buf, int size)
 {
 	int fd;
 	int ret;
-	unsigned char buf[8192];
 
-	fd = open(TEST_FILE, O_RDWR);
+	fd = open(RW_TEST_FILE, O_CREAT | O_RDWR | O_DIRECT);
 	assert(fd != -1);
 
-	ret = read(fd, buf, sizeof(buf));
+	ret = write(fd, buf, size);
 	assert(ret != -1);
 
-	dump_data(buf, 32);
-	//printf("0x0: %x\n", buf[0]);
+	close(fd);
+}
+
+static void
+rw_test_read(unsigned char *buf, int size)
+{
+
+	int fd;
+	int ret;
+
+	fd = open(RW_TEST_FILE, O_RDWR);
+	assert(fd != -1);
+
+	ret = read(fd, buf, size);
+	assert(ret != -1);
 
 	close(fd);
+}
+
+static void
+rw_test(void)
+{
+	unsigned char buf[BUFSZ];
+
+	memset(buf, 0xA5, sizeof(buf));
+
+	rw_test_create(buf, sizeof(buf));
+
+	memset(buf, 0x0, sizeof(buf));
+	rw_test_read(buf, sizeof(buf));
+
+	dump_data(buf, 32);
 }
 
 int
