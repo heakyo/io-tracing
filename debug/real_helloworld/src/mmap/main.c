@@ -113,7 +113,7 @@ main(int argc, char *args[])
 	//mmap_test();
 	rw_test();
 
-	getchar();
+	//getchar();
 
 	return 0;
 }

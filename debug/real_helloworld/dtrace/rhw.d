@@ -2,6 +2,7 @@
 
 /*
  * 	./rhw.d -c './main'
+ *      dtrace -n 'bdone:entry /execname == "intr"/ {stack();}'
  */
 
 #pragma D option flowindent
@@ -11,7 +12,55 @@ BEGIN
         proc = "main"
 }
 
+/*Dev Driver*************************************************************************************/
+ahciaction:entry
+/execname == proc/
+{
+	this->ccb = args[1];
+
+	printf("ccb:func_code:0x%x",
+		this->ccb->ccb_h.func_code
+		);
+}
+/*-----------------------------------------------------------------------------*/
+ahciaction:return
+/execname == proc/
+{
+}
+
 /*common*************************************************************************************/
+ffs_geom_strategy:entry
+/execname == proc/
+{
+}
+
+ffs_geom_strategy:return
+/execname == proc/
+{}
+
+ufs_strategy:entry
+/execname == proc/
+{
+	self->ap = args[0];
+	self->a_vp = self->ap->a_vp;
+
+	self->ufsmount = (struct ufsmount *)self->a_vp->v_mount->mnt_data;
+	printf("mount:%p",
+		self->a_vp->v_mount
+		);
+
+	printf("\n\t\t\t\t\t      ");
+	printf("ufs:fstype:%x mountp:%p",
+		self->ufsmount->um_fstype,
+		self->ufsmount->um_mountp
+	);
+	func((uintptr_t)self->ufsmount->um_bo->bo_ops);
+}
+
+ufs_strategy:return
+/execname == proc/
+{}
+
 _vn_open:entry,
 _vn_open:return
 /execname == proc/
@@ -64,7 +113,11 @@ vn_io_fault_doio:return
 cluster_read:*
 /execname == proc/
 {
-	stack();
+}
+
+bufwait:*
+/execname == proc/
+{
 }
 
 /*VOP**********************************************************************************************************/
@@ -315,7 +368,8 @@ breada:entry
 
 bstrategy:entry
 /execname == proc/
-{}
+{
+}
 
 breadn_flags:entry
 /execname == proc/
@@ -350,6 +404,11 @@ breadn_flags:entry
 		this->vm_page0->a.queue
 		);
 	printf("\n\t\t\t\t\t      ");
+
+/********************************* ufsmount *************************************/
+	this->ufsmount = (struct ufsmount *)this->vp->v_mount->mnt_data;
+	printf("ufs:fstype:%x", this->ufsmount->um_fstype);
+	/*func((uintptr_t)this->ufsmount->um_bo->bo_ops);*/
 
 	/*stack();*/
 }
@@ -672,12 +731,12 @@ getblkx:return
 
 	printf("ret:%d", args[1]);
 	printf("\n\t\t\t\t\t      ");
-
 	printf("bp:%p data:%p flags:%x",
 		this->ret_bp,
 		this->ret_bp->b_data,
 		this->ret_bp->b_flags
 		);
+	func((uintptr_t)this->ret_bp->b_bufobj->bo_ops->bop_strategy);
 	printf("\n\t\t\t\t\t      ");
 }
 
@@ -712,6 +771,7 @@ bstrategy:return
 ffs_blkatoff:return
 /execname == proc/
 {
+/*
 	printf("ret:%d", args[1]);
 	printf("\n\t\t\t\t\t      ");
 	printf("bpp:0x%p(v:0x%p)", this->bpp, *this->bpp);
@@ -724,6 +784,7 @@ ffs_blkatoff:return
 		this->ep->d_reclen,
 		this->ep->d_namlen,
 		this->ep->d_name);
+*/
 }
 
 ufs_lookup_ino:return
