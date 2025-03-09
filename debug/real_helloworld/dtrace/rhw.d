@@ -28,7 +28,71 @@ ahciaction:return
 {
 }
 
+/*amd64*************************************************************************************/
+uiomove_fromphys:entry
+/execname == proc/
+{
+	this->offset = args[1];
+	this->n = args[2];
+	this->uio = args[3];
+
+	printf("offset:%d n:%d",
+		this->offset,
+		this->n
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("uio:resid:%d segflg:%x rw:%d iovcnt:%d",
+		this->uio->uio_resid,
+		this->uio->uio_segflg,
+		this->uio->uio_rw,
+		this->uio->uio_iovcnt
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->iov = this->uio->uio_iov;
+	this->cnt = this->iov->iov_len;
+	printf("iov:cnt:%d",
+		this->cnt
+		);
+}
+
+uiomove_fromphys:return
+/execname == proc/
+{
+/*
+	this->iov_val = copyinstr((uintptr_t)this->iov->iov_base-this->cnt);
+	trace(this->iov_val);
+*/
+}
+
+/*pmap*************************************************************************************/
+pmap_map_io_transient:entry
+/execname == proc/
+{
+	self->vaddrp = args[1];
+	printf("vaddr:%p",
+		self->vaddrp
+		);
+}
+
+pmap_map_io_transient:return
+/execname == proc/
+{
+	this->vaddr = *self->vaddrp;
+	this->v = *(char *)this->vaddr;
+	printf("vaddr:%x %x",
+		this->vaddr,
+		this->v
+		);
+	printf("\n\t\t\t\t\t      ");
+}
+
 /*common*************************************************************************************/
+vn_io_fault_*move:*
+/execname == proc/
+{}
+
 ffs_geom_strategy:entry
 /execname == proc/
 {

@@ -97,6 +97,7 @@ rw_test(void)
 
 	memset(buf, 0xA5, sizeof(buf));
 
+	/* Comment out this line to set the flag B_CACHE */
 	rw_test_create(buf, sizeof(buf));
 
 	memset(buf, 0x0, sizeof(buf));
