@@ -9,6 +9,8 @@
 
 BEGIN
 {
+	dmaplimit = *(vm_paddr_t *)0xffffffff83e15838;
+	unmapped_buf = *(caddr_t *)0xffffffff83df55c0;
         proc = "main"
 }
 
@@ -70,11 +72,28 @@ uiomove_fromphys:return
 pmap_map_io_transient:entry
 /execname == proc/
 {
+	self->page = args[0];
 	self->vaddrp = args[1];
+
+	printf("paddr:%p", self->page[0]->phys_addr);
+	printf("\n\t\t\t\t\t      ");
+
 	printf("vaddr:%p",
 		self->vaddrp
 		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("dmaplimit:0x%x", dmaplimit);
 }
+
+pmap_qenter:entry
+/execname == proc/
+{
+}
+/*-------------------------------------------------------------------------------*/
+pmap_qenter:return
+/execname == proc/
+{}
 
 pmap_map_io_transient:return
 /execname == proc/
@@ -90,6 +109,45 @@ pmap_map_io_transient:return
 
 /*common*************************************************************************************/
 vn_io_fault_*move:*
+/execname == proc/
+{}
+
+bdata2bio:entry
+/execname == proc/
+{
+	self->bp = args[0];
+	self->bip = args[1];
+
+	printf("bp:data:%p unmapped_buf:%p",
+		self->bp->b_data,
+		unmapped_buf
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("bip:ma:%p ma_n:%d data:%p",
+		self->bip->bio_ma,
+		self->bip->bio_ma_n,
+		self->bip->bio_data
+		);
+}
+
+bdata2bio:return
+/execname == proc/
+{
+	printf("bip:ma:%p ma_n:%d data:%p",
+		self->bip->bio_ma,
+		self->bip->bio_ma_n,
+		self->bip->bio_data
+		);
+}
+
+g_vfs_strategy:entry
+/execname == proc/
+{
+
+}
+
+g_vfs_strategy:return
 /execname == proc/
 {}
 
@@ -493,6 +551,12 @@ getblk_core:entry
 }
 
 gbincore_unlocked:entry
+/execname == proc/
+{
+}
+
+getnewbuf:*,
+allocbuf_flags:*
 /execname == proc/
 {
 }
