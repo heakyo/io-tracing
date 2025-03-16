@@ -14,6 +14,66 @@ BEGIN
         proc = "main"
 }
 
+/*CAM*************************************************************************************/
+adastrategy:entry
+/execname == proc/
+{}
+
+adastart:entry
+/execname == proc/
+{
+	self->periph = args[0];
+	self->start_ccb = args[1];
+
+	this->softc = (struct ada_softc *)self->periph->softc;
+
+	printf("periph:%p start_ccb:%p",
+		self->periph,
+		self->start_ccb
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("softc:state:%d",
+		this->softc->state
+		);
+}
+
+cam_iosched_next_bio:entry
+/execname == proc/
+{}
+
+cam_fill_ataio:entry
+/execname == proc/
+{
+}
+
+/*-----------------------------------------------------------------------------*/
+
+cam_fill_ataio:return
+/execname == proc/
+{}
+
+cam_iosched_next_bio:return
+/execname == proc/
+{
+	self->ret_biop = args[1];
+
+	printf("biop(%p):cmd:%d flags:0x%x data:%p",
+		self->ret_biop,
+		self->ret_biop->bio_cmd,
+		self->ret_biop->bio_flags,
+		self->ret_biop->bio_data
+		);
+}
+
+adastart:return
+/execname == proc/
+{}
+
+adastrategy:return
+/execname == proc/
+{}
+
 /*Dev Driver*************************************************************************************/
 ahciaction:entry
 /execname == proc/
@@ -124,7 +184,8 @@ bdata2bio:entry
 		);
 	printf("\n\t\t\t\t\t      ");
 
-	printf("bip:ma:%p ma_n:%d data:%p",
+	printf("bip(%p):ma:%p ma_n:%d data:%p",
+		self->bip,
 		self->bip->bio_ma,
 		self->bip->bio_ma_n,
 		self->bip->bio_data

@@ -103,7 +103,7 @@ rw_test(void)
 	memset(buf, 0x0, sizeof(buf));
 	rw_test_read(buf, sizeof(buf));
 
-	dump_data(buf, 32);
+	//dump_data(buf, 32);
 }
 
 int
