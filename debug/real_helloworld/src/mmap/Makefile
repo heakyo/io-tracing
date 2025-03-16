@@ -21,3 +21,6 @@ mkdata:
 rhwd: main
 	./rhw.d -c './main'
 	#rm -rf $(TEST_FILE)
+
+rhw_sysread: main
+	./rhw_sysread.d -c './main'

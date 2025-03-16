@@ -7,7 +7,8 @@
 #include <sys/stat.h>
 
 #define TEST_FILE "gm0_mnt/data8k"
-#define RW_TEST_FILE "gm0_mnt/data_rw8k"
+//#define RW_TEST_FILE "gm0_mnt/data_rw8k"
+#define RW_TEST_FILE "gm0_mnt/data_rw32k"
 
 #define BUFSZ 8192
 
@@ -106,13 +107,23 @@ rw_test(void)
 	//dump_data(buf, 32);
 }
 
+static void
+sysread_test(void)
+{
+	unsigned char buf[BUFSZ];
+
+	memset(buf, 0x0, sizeof(buf));
+	rw_test_read(buf, sizeof(buf));
+}
+
 int
 main(int argc, char *args[])
 {
 	printf("Real Hello World\n");
 
 	//mmap_test();
-	rw_test();
+	//rw_test();
+	sysread_test();
 
 	//getchar();
 
