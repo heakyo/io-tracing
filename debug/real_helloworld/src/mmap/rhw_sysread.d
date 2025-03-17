@@ -25,22 +25,61 @@ sys_read:return
 {}
 
 /*VFS File System*************************************************************************************/
+cluster_read:entry
+/execname == proc/
+{}
+
+vn_io_fault_pgmove:entry
+/execname == proc/
+{
+}
+
+/*-----------------------------------------------------------------------------*/
+vn_io_fault_pgmove:return
+/execname == proc/
+{}
+
+cluster_read:return
+/execname == proc/
+{}
+
+
+/*FFS File System*************************************************************************************/
 ffs_read:entry
 /execname == proc/
 {
 	self->ap = args[0];
 
+	/************************* uio *************************/
+	self->uio = self->ap->a_uio;
+	printf("uio:offset:%d resid:%d ioflag:%p",
+		self->uio->uio_offset,
+		self->uio->uio_resid,
+		self->ap->a_ioflag
+		);
+	printf("\n\t\t\t\t\t      ");
+
 	/************************* vnode *************************/
 	self->vp = self->ap->a_vp;
-	printf("vnode(%p):",
-		self->vp
+	printf("vnode(%p):tag:%s type:%d",
+		self->vp,
+		stringof(self->vp->v_tag),
+		self->vp->v_type
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	/************************* mount *************************/
+	self->mnt = self->vp->v_mount;
+	printf("mount:flag:%x",
+		self->mnt->mnt_flag
 		);
 	printf("\n\t\t\t\t\t      ");
 
 	/************************* inode *************************/
 	self->ip = (struct inode *)self->vp->v_data;
-	printf("inode:number:%d",
-		self->ip->i_number
+	printf("inode:number:%d size:%d",
+		self->ip->i_number,
+		self->ip->i_size
 		);
 	printf("\n\t\t\t\t\t      ");
 
@@ -53,11 +92,12 @@ ffs_read:entry
 
 	/************************* vm_object *************************/
 	self->vmobj = self->bufobj.bo_object;
-	printf("vmobj(%p):type:%d size:%d handle:%p",
+	printf("vmobj(%p):type:%d size:%d handle:%p resident_page_count:%d",
 		self->vmobj,
 		self->vmobj->type,
 		self->vmobj->size,
-		self->vmobj->handle
+		self->vmobj->handle,
+		self->vmobj->resident_page_count
 		);
 	printf("\n\t\t\t\t\t      ");
 
@@ -80,21 +120,9 @@ ffs_read:entry
 		self->vmpg1->flags,
 		self->vmpg1->object
 		);
-
-
-}
-
-breadn_flags:entry
-/execname == proc/
-{
 }
 
 /*-----------------------------------------------------------------------------*/
-breadn_flags:return
-/execname == proc/
-{
-}
-
 ffs_read:return
 /execname == proc/
 {}
