@@ -24,3 +24,6 @@ rhwd: main
 
 rhw_sysread: main
 	./rhw_sysread.d -c './main'
+
+rhw_intr: main
+	./rhw_intr.d -c './main'

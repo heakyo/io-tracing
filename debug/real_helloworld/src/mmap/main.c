@@ -7,8 +7,8 @@
 #include <sys/stat.h>
 
 #define TEST_FILE "gm0_mnt/data8k"
-//#define RW_TEST_FILE "gm0_mnt/data_rw8k"
-#define RW_TEST_FILE "gm0_mnt/data_rw32k"
+#define RW_TEST_FILE "gm0_mnt/data_rw8k"
+//#define RW_TEST_FILE "gm0_mnt/data_rw32k"
 
 #define BUFSZ 8192
 
@@ -122,8 +122,8 @@ main(int argc, char *args[])
 	printf("Real Hello World\n");
 
 	//mmap_test();
-	//rw_test();
-	sysread_test();
+	rw_test();
+	//sysread_test();
 
 	//getchar();
 
