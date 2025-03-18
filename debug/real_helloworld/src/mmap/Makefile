@@ -27,3 +27,6 @@ rhw_sysread: main
 
 rhw_intr: main
 	./rhw_intr.d -c './main'
+
+rhw_cam: main
+	./rhw_cam.d -c './main'
