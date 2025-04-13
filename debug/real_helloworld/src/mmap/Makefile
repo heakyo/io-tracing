@@ -30,3 +30,6 @@ rhw_intr: main
 
 rhw_cam: main
 	./rhw_cam.d -c './main'
+
+rhw_ffsread: main
+	./rhw_ffsread.d -c './main'

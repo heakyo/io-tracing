@@ -7,10 +7,11 @@
 #include <sys/stat.h>
 
 #define TEST_FILE "gm0_mnt/data8k"
-#define RW_TEST_FILE "gm0_mnt/data_rw8k"
-//#define RW_TEST_FILE "gm0_mnt/data_rw32k"
+//#define RW_TEST_FILE "data_rw32k"
+#define RW_TEST_FILE "gm0_mnt/data_rw32k"
 
-#define BUFSZ 8192
+// the buf size 8k can make the flag B_CACHE unset
+#define BUFSZ (1024*8)
 
 //unsigned char a[4096] = {0x55};
 unsigned char a[4096];
@@ -101,6 +102,7 @@ rw_test(void)
 	/* Comment out this line to set the flag B_CACHE */
 	rw_test_create(buf, sizeof(buf));
 
+	//printf("buf:%p nbytes:%ld\n", buf, sizeof(buf));
 	memset(buf, 0x0, sizeof(buf));
 	rw_test_read(buf, sizeof(buf));
 
@@ -122,8 +124,8 @@ main(int argc, char *args[])
 	printf("Real Hello World\n");
 
 	//mmap_test();
-	rw_test();
 	//sysread_test();
+	rw_test();
 
 	//getchar();
 

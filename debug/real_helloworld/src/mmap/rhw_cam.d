@@ -14,16 +14,21 @@ BEGIN
 
 /*sys*************************************************************************************/
 /* probemod:probefunc:probename */
-kernel:sys_read:*
+kernel:sys_read:entry
 /execname == proc/
 {
-	trace(probename);
+	self->td = args[0];
+	self->uap = args[1];
 
-	if (probename == "entry") {
-		sysread = 1;
-	} else if (probename == "return") {
-		sysread = 0;
-	}
+	trace(probename);
+	printf("\n\t\t\t\t\t      ");
+
+	sysread = 1;
+
+	printf("uap:buf:%p nbyte:%d",
+		self->uap->buf,
+		self->uap->nbyte
+		);
 }
 
 
@@ -66,4 +71,13 @@ adastrategy:entry
 adastrategy:return
 /execname == proc && sysread/
 {}
+
+kernel:sys_read:return
+/execname == proc/
+{
+	trace(probename);
+	printf("\n\t\t\t\t\t      ");
+
+	sysread = 0;
+}
 
