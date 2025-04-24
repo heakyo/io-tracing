@@ -28,11 +28,16 @@ docker login pscale.artifactory.cec.lab.emc.com
 # Login to the docker
 docker exec -it container-id bash
 
+# export bin
+export PATH=$PATH:/root/bin
+
 # Logout the docker
 Ctrl + D
 
 # connect the target server with en-condebox
 /root/bin/en-condebox 10.124.115.31:7031 9800
+or
+condebox DURINF510-4 9800
 
 # optional
 # set /etc/fstab
