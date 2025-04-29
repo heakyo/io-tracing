@@ -33,3 +33,6 @@ rhw_cam: main
 
 rhw_ffsread: main
 	./rhw_ffsread.d -c './main'
+
+rhw_mem_map: main
+	./rhw_mem_map.d -c './main'
