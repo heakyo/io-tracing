@@ -4,8 +4,12 @@
 # We neet to run the commands below after running the script startup.sh
 docker cp /root/mma/repo/isi-repo/io-tracing/debug/common/gdbinit kgdb-onefs:/root/.gdbinit
 ## for remote dev
-docker cp /ifs/home/mma/repo/isi-repo/io-tracing/debug/common/gdbinit kgdb-onefs:/root/.gdbinit
+docker cp /ifs/home/mma/repo/io-tracing/debug/common/gdbinit kgdb-onefs:/root/.gdbinit
 docker exec -it kgdb-onefs bash
+
+# modify .gdbinit
+vim /root/.gdbinit
+#modify the function add_modules
 
 # In docker
 isi_kgdb -q
