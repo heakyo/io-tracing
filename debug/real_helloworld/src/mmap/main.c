@@ -21,59 +21,215 @@ unsigned char a[4096];
 static int
 mmap_test_anon(void)
 {
-	pid_t pid;
-	char *mapped_region;
-	size_t size = 4096*1; // One memory page
+	char *p1;
+	size_t sz = 4096*256;
 	int ret;
 
+	p1 = mmap(NULL, sz, PROT_READ | PROT_WRITE,
+			MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	assert(p1 != MAP_FAILED);
+	printf("Reading p1(%p) --- %d\n", p1, p1[0]);
+
+	printf("Writing 'A' to p1(%p)\n", p1);
+	memset(p1, 'A', 4096);  // Parent writes first
+	printf("Reading p1(%p) --- %c\n", p1, p1[0]);
+
+	ret = munmap(p1, sz);
+	assert(ret != -1);
+
+	return 0;
+}
+
+static int
+mmap_test_file_fork(void)
+{
+	pid_t pid;
+	char *p1, *p2;
+	int fd;
+	int ret;
+	int res = 4096*1;
+	size_t length;
+	struct stat sb;
+
+	fd = open("data16k", O_RDWR);
+	assert(fd != -1);
+
+	ret = fstat(fd, &sb);
+	assert(ret != -1);
+	length = sb.st_size;
+	//length = 4096*3;
+	printf("sb:size:%ld\n", sb.st_size);
+
+	p1 = mmap(NULL, length, PROT_READ | PROT_WRITE,
+			MAP_PRIVATE, fd, 0);
+	assert(p1 != MAP_FAILED);
+	printf("Parent -- Reading p1(%p) --- 0x%x\n", p1, p1[0]);
+
+	printf("Parent -- Writing 'A' to p1(%p)\n", p1);
+	//memset(p1, 'A', res); // This will affect the number of resident pages.
+	printf("Parent -- Reading p1(%p) --- [0]:%c--[%d]:%c\n", p1, p1[0], res-1, p1[res-1]);
+
+
+	//pid = fork();
+	pid = 1;
+	assert(pid >= 0);
+
+	if (pid == 0) {
+
+		size_t unmap_len = 4096*1;
+
+		printf("Child -- Writing 'C' to p1(%p)\n", p1);
+		memset(p1, 'C', unmap_len);
+		printf("Child -- Reading p1(%p) --- %c\n", p1, p1[0]);
+
+		printf("Child -- Writing 'D' to p1(%p)\n", p1);
+		//memset(p1, 'D', 4096*1);
+		printf("Child -- Reading p1(%p) --- %c\n", p1, p1[0]);
+
+		printf("Child -- Writing 'E' to p1(%p)\n", p1);
+		//memset(p1, 'E', 4096*1);
+		printf("Child -- Reading p1(%p) --- %c\n", p1, p1[0]);
+
+		sleep(2);
+		printf("Child -- munmap p1:%p\n", p1);
+		ret = munmap(p1, length);
+		assert(ret != -1);
+
+	} else {
+
+		p2 = p1 + 4096;
+		printf("Parent -- Writing 'B' to p2(%p)\n", p2);
+		memset(p2, 'B', res); // This will affect the number of resident pages.
+		printf("Parent -- Reading p2(%p) --- [0]:%c--[%d]:%c\n", p2, p2[0], res-1, p2[res-1]);
+
+		//sleep(1);
+		ret = munmap(p1, length);
+
+		printf("Parent -- Waiting for child to exit\n");
+		//wait(NULL);
+	}
+
+	printf("Parent -- munmap p1:%p\n", p1);
+	//ret = munmap(p1, length);
+	ret = 0;
+	assert(ret != -1);
+
+	close(fd);
+
+	return 0;
+}
+
+static int
+mmap_test_anon_fork(void)
+{
+	pid_t pid;
+	char *mapped_region, *p1, *p2;
+	size_t size = 4096*512;
+	size_t sz = 4096*1024;
+	int ret;
+
+	printf("Parent -- before memory mapping...\n");
 	//getchar();
+
+	p1 = mmap(NULL, sz, PROT_READ | PROT_WRITE,
+			MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	assert(p1 != MAP_FAILED);
+
+	p2 = mmap(NULL, sz, PROT_READ | PROT_WRITE,
+			MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	assert(p2 != MAP_FAILED);
+
+	printf("Parent -- memory mapping...\n");
 	mapped_region = mmap(NULL, size, PROT_READ | PROT_WRITE,
 			MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	assert(mapped_region != MAP_FAILED);
 
-	// Use the memory
-	//strcpy((char *)mapped_region, "Hello from mmap!");
-	//printf("%s\n", (char *)mapped_region);
+	printf("\tp1:%p\n\tp2:%p\n\tmr:%p\n",
+		p1, p2, mapped_region);
+///////////////////////////////////////////////////////////////////
 
-	printf("Parent -- Writing 'A' to memory\n");
-	memset(mapped_region, 'A', size);  // Parent writes first
+	// Use the memory
+	printf("Parent -- Writing 'A' to p1\n");
+	memset(p1, 'A', sz);  // Parent writes first
+	printf("Parent -- Writing 'B' to p2\n");
+	memset(p2, 'B', sz);  // Parent writes first
+	printf("Parent -- Writing 'C' to memory mapped_region\n");
+	memset(mapped_region, 'C', size);  // Parent writes first
+///////////////////////////////////////////////////////////////////
+
+	/*unmap p2 to make a hole between p1 and mapped_region*/
+	ret = munmap(p2, sz);
+	assert(ret != -1);
+///////////////////////////////////////////////////////////////////
+
+	printf("Parent -- before forking child. Waiting 3 seconds\n");
+	sleep(3);
 
 	pid = fork();
-
+	//pid = 1;
 	if (pid < 0) {
 		perror("fork");
 		exit(1);
 	}
 
 	if (pid == 0) {
+
+		char c = 'D';
+
 		// Child process
-		printf("Child -- Reading memory before write. %c\n", mapped_region[0]);
-		printf("Child -- Writing 'B' to memory (triggers Copy-On-Write!)\n");
-		mapped_region[0] = 'B';
-		printf("Child -- Reading memory after write. %c\n", mapped_region[0]);
+		printf("Child -- Reading memory before writing. '%c'\n", mapped_region[0]);
+		printf("Child -- Writing '%c' to memory (triggers Copy-On-Write!)\n", c);
+		mapped_region[0] = c;
+		memset(mapped_region, c, size);
+		printf("Child -- Reading memory after writing. %c\n", mapped_region[0]);
 
+		//getchar();
+		printf("Child -- before munmapping mapped_region\n");
 		sleep(3);
-
-	//getchar();
-	ret = munmap(mapped_region, size);
-	assert(ret != -1);
+		ret = munmap(mapped_region, size);
+		assert(ret != -1);
 
 		printf("Child -- exiting...\n");
 		exit(0);
+
 	} else {
 		// Parent process
+
+if (0) {
+	// Unmap when done
+	printf("Parent -- before munmapping mapped_region\n");
+	sleep(1);
+	ret = munmap(mapped_region, size);
+	printf("Parent -- ret:%d\n", ret);
+	assert(ret != -1);
+}
+
+		printf("Parent -- Wait for child to modify memory\n");
 		sleep(1); // Wait for child to modify memory
 		printf("Parent -- Reading memory:%c\n", mapped_region[0]);
 
 		wait(NULL);
 	}
 
+	//getchar();
+	printf("Parent -- before munmapping p1\n");
+	sleep(5);
+	ret = munmap(p1, sz);
+	assert(ret != -1);
+
+	//getchar();
+
+if (1) {
 	// Unmap when done
-	printf("Parent -- unmapping memory\n");
+	printf("Parent -- before munmapping mapped_region\n");
+	sleep(5);
 	ret = munmap(mapped_region, size);
 	printf("Parent -- ret:%d\n", ret);
 	assert(ret != -1);
+}
 
+	printf("Parent -- before exiing...\n");
+	sleep(3);
 	return 0;
 }
 
@@ -184,7 +340,12 @@ main(int argc, char *args[])
 {
 	printf("Real Hello World\n");
 
-	mmap_test_anon();
+	//mmap_test_anon();
+
+	/* important -- make rhw_mem_map */
+	mmap_test_file_fork();
+
+	//mmap_test_anon_fork();
 	//mmap_test();
 	//sysread_test();
 	//rw_test();
