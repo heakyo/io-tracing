@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <assert.h>
@@ -36,6 +37,60 @@ mmap_test_anon(void)
 
 	ret = munmap(p1, sz);
 	assert(ret != -1);
+
+	return 0;
+}
+
+#define WRBUFSZ (32*1024)
+static int
+file_mmap(bool wflag)
+{
+	unsigned char *p1;
+	int fd;
+	char buf[WRBUFSZ];
+	int ret;
+	size_t length;
+	struct stat sb;
+
+	fd = open("data32k", O_RDWR | O_CREAT | O_TRUNC);
+	assert(fd != -1);
+
+	memset(buf, 0x15, sizeof(buf));
+	ret = write(fd, buf, sizeof(buf));
+	assert(ret != -1);
+
+if (1) {
+	ret = fstat(fd, &sb);
+	assert(ret != -1);
+
+	length = sb.st_size;
+	printf("length:%ld\n", length);
+
+	printf("Memory mapping....\n");
+	p1 = mmap(NULL, length, PROT_READ | PROT_WRITE,
+			MAP_SHARED,
+			//MAP_PRIVATE,
+			fd, 0);
+	assert(p1 != MAP_FAILED);
+
+	printf("Stop....\n");
+
+	if (wflag) {
+		printf("Writing....\n");
+		memset(p1, 0xb5, 4096*2);
+		msync(p1, length, MS_SYNC);
+	}
+
+	printf("Reading....\n");
+	printf("%08x\n", p1[0]);
+
+	printf("Stop....\n");
+
+	printf("Memory unmapping....\n");
+	ret = munmap(p1, length);
+	assert(ret != -1);
+}
+	close(fd);
 
 	return 0;
 }
@@ -336,14 +391,31 @@ sysread_test(void)
 }
 
 int
-main(int argc, char *args[])
+main(int argc, char *argv[])
 {
+	int ch;
+	bool wflag;
+
 	printf("Real Hello World\n");
+
+	wflag = false;
+
+	while ((ch = getopt(argc, argv, "w")) != -1) {
+		switch (ch) {
+		case 'w':
+			wflag = true;
+			break;
+		default:
+			printf("-----\n");
+		}
+	}
+	argc -= optind;
+	argv += optind;
 
 	//mmap_test_anon();
 
 	/* important -- make rhw_mem_map */
-	mmap_test_file_fork();
+	//mmap_test_file_fork();
 
 	//mmap_test_anon_fork();
 	//mmap_test();
@@ -352,5 +424,6 @@ main(int argc, char *args[])
 
 	//getchar();
 
+	file_mmap(wflag);
 	return 0;
 }

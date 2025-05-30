@@ -36,3 +36,6 @@ rhw_ffsread: main
 
 rhw_mem_map: main
 	./rhw_mem_map.d -c './main'
+
+rhw_file_mmap: main
+	./rhw_file_mmap.d -c './main -w'
