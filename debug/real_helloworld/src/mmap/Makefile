@@ -39,3 +39,6 @@ rhw_mem_map: main
 
 rhw_file_mmap: main
 	./rhw_file_mmap.d -c './main -w'
+
+rhw_dirty: main
+	./pagers/dirty/rhw_dirty.d -c './main -w'
