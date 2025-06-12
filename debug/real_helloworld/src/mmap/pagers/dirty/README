@@ -1,0 +1,4 @@
+# this test shows the backtrace where the dirty flag for the physical page is cleared.
+
+# do test
+make rhw_dirty
