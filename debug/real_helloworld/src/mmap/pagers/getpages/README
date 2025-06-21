@@ -1,0 +1,11 @@
+# This test has two functions. The only difference is we need to pass different parameter to the program main
+# 1. Show the function bufdone_finish where the flag B_CACHE is set in the buf struct
+## ./rhw_getpages.d -c './main -r'
+# call pread
+make rhw_getpages
+
+# 2. Show the backtrace of how getpages works
+# The key step is we need to remount the file system where the test files are included.
+## ./rhw_getpages.d -c './main -s
+# call sys_map
+make rhw_getpages
