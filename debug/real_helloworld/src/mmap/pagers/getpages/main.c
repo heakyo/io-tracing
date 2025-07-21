@@ -16,12 +16,14 @@ bool run_pread, run_sysmap;
 static int
 read_file(void)
 {
-	char buf[BUFSZ], *p1, c;
+	unsigned char buf[BUFSZ], *p1, c;
 	int fd;
 	off_t offset;
 	int ret;
         size_t length;
         struct stat sb;
+
+	memset(buf, 0x0, sizeof(buf));
 
 	fd = open("mnt/data", O_RDWR);
 	if (fd == -1) {
@@ -57,6 +59,8 @@ read_file(void)
 		offset = 0;
 		ret = pread(fd, buf, sizeof(buf), offset);
 		assert(ret != 1);
+
+		//printf("%x\n", buf[0]);
 	}
 
 	close(fd);

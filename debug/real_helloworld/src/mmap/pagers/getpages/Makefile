@@ -20,5 +20,5 @@ gen_data:
 rhw_getpages: main
 	mount /dev/ada0p19 mnt
 	fsync $(DATA)
-	./rhw_getpages.d -c './main -s'
+	./rhw_getpages.d -c './main -r'
 	umount mnt
