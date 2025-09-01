@@ -7,7 +7,13 @@ DOCKER_IMAGE=pscale.artifactory.cec.lab.emc.com/pscale-docker-local/test-control
 MYUSER=mam28
 MYTOKEN=cmVmdGtuOjAxOjE3NjA1OTM4MzE6OGJnd1VNOGhpTTZqSmFSTUJBUVhUWUNiR1dE
 
-BIN_PATH=$(realpath ../)/bin
+# Remote Path
+BIN_PATH=/mnt/docker/bin
+QA_PATH=/mnt/qalogserver/qa
+
+# Local Path
+#BIN_PATH=$(realpath ../)/bin
+#QA_PATH=/mnt/qalogserver_cn/qa
 
 usage()
 {
@@ -26,7 +32,7 @@ run_test_controller()
 	docker pull ${DOCKER_IMAGE}:${DOCKER_VERSION}
 	docker run -d -it --rm --name=$DOCKER_NAME --network=host \
 		-v $BIN_PATH:/root/bin \
-		-v /mnt/qalogserver_cn/qa:/mnt/qalogserver/qa \
+		-v $QA_PATH:/mnt/qalogserver/qa \
 		-e BUILD_ID=${VERSION} \
 		-e USE_INTERNAL_EPEL=yes \
 		-e PSCALE_ARTIFACTORY_READ_USER=${MYUSER} \
@@ -35,7 +41,7 @@ run_test_controller()
 		/bin/bash -l
 }
 
-main()
+check_parameter()
 {
 	if [ -z $1 ]; then
 		usage
@@ -46,7 +52,24 @@ main()
 		DOCKER_NAME=test-controller
 	fi
 
-	echo $BIN_PATH $DOCKER_NAME
+	if [ ! -d "$QA_PATH" ]; then
+		echo "$QA_PATH does not exist"
+		exit -1
+	fi
+
+	if ! mountpoint -q "$QA_PATH"; then
+		echo "$QA_PATH is NOT mounted"
+		exit -1
+	fi
+}
+
+main()
+{
+	check_parameter $1 $2
+
+	echo $BIN_PATH
+	echo $QA_PATH
+	echo $DOCKER_NAME
 	run_test_controller
 }
 

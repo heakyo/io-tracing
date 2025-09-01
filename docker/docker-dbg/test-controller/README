@@ -22,6 +22,23 @@ password cmVmdGtuOjAxOjE3NjA1OTM4MzE6OGJnd1VNOGhpTTZqSmFSTUJBUVhUWUNiR1dE
 docker login pscale.artifactory.cec.lab.emc.com
 # enter the user name and password(token)
 
+# Check if QA_PATH is mounted
+# Set /etc/fstab
+# For remote dev
+echo "qalogserver.isilon.com:/ifs/qa /mnt/qalogserver/qa nfs rw,hard,intr,nolock,tcp,vers=3,noauto 0 0" >> /etc/fstab
+mkdir /mnt/qalogserver/qa
+mount /mnt/qalogserver/qa
+df -Th /mnt/qalogserver/qa
+
+# For local
+echo "10.124.114.70:/share /mnt/qalogserver_cn nfs rw,tcp,intr,vers=3,bg 0 0" >> /etc/fstab
+mkdir /mnt/qalogserver_cn
+mount /mnt/qalogserver_cn
+df -Th /mnt/qalogserver_cn
+------------------------------------------------------------------------------------------------
+Filesystem           Type  Size  Used Avail Use% Mounted on
+10.124.114.70:/share nfs   422T  1.5T  398T   1% /mnt/qalogserver_cn
+
 # Run the command
 ./startup.sh B_MAIN_3923_DBG_001
 
@@ -44,13 +61,4 @@ Ctrl + D
 or
 condebox DURINF510-4 9800
 
-# optional
-# set /etc/fstab
-mkdir /mnt/qalogserver_cn
-echo "10.124.114.70:/share /mnt/qalogserver_cn nfs rw,tcp,intr,vers=3,bg 0 0" >> /etc/fstab
-mount /mnt/qalogserver_cn
-df -Th /mnt/qalogserver_cn
-------------------------------------------------------------------------------------------------
-Filesystem           Type  Size  Used Avail Use% Mounted on
-10.124.114.70:/share nfs   422T  1.5T  398T   1% /mnt/qalogserver_cn
 
