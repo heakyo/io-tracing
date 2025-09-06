@@ -410,11 +410,21 @@ getblk_core:entry
 	printf("\n\t\t\t\t\t      ");
 
 	this->obj = self->vp->v_bufobj.bo_object;
-	printf("obj:%p size:%d res_pg_cnt:%d",
+	printf("obj:%p size:%d res_pg_cnt:%d handle:%p",
 		this->obj,
 		this->obj->size,
-		this->obj->resident_page_count
+		this->obj->resident_page_count,
+		this->obj->handle
 		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->un_pager = this->obj->un_pager;
+	this->vnp = this->un_pager.vnp;
+	printf("vnp:size:%d, writemappings:%d",
+		this->vnp.vnp_size,
+		this->vnp.writemappings
+		);
+
 	/*stack();*/
 }
 
