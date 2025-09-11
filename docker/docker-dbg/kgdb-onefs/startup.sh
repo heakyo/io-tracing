@@ -8,6 +8,10 @@ MYUSER=mam28
 MYTOKEN=cmVmdGtuOjAxOjE3NjA1OTM4MzE6OGJnd1VNOGhpTTZqSmFSTUJBUVhUWUNiR1dE
 
 SYM_PATH=$(realpath ./)/symbols
+#SRC_PATH=$HOME/isilon/isi-src/onefs
+
+# Remote
+SRC_PATH=/export/onefs
 
 usage()
 {
@@ -22,7 +26,7 @@ run_test_controller()
 	docker pull ${DOCKER_IMAGE}:${DOCKER_VERSION}
 	docker run -d -it --rm --name=kgdb-onefs \
 		-v $SYM_PATH:/tmp/symbols \
-		-v $HOME/isilon/isi-src/onefs:/tmp/isilon_mnt/src \
+		-v $SRC_PATH:/tmp/isilon_mnt/src \
 		-e BUILD_ID=${VERSION} \
 		-e USE_INTERNAL_EPEL=yes \
 		-e PSCALE_ARTIFACTORY_READ_USER=${MYUSER} \

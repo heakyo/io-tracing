@@ -61,4 +61,15 @@ Ctrl + D
 or
 condebox DURINF510-4 9800
 
+# find the Serial for the vcluster
+# 1. check the Labels of cluster.
+https://ducttape.west.isilon.com/ui/
+# 2. search the Label in taskmaster
+https://taskmaster.west.isilon.com/server/
+# 3. check the serial of the vcluster
+
+
+
+
+
 
