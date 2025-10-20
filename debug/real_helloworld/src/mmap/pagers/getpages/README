@@ -9,3 +9,15 @@ make rhw_getpages
 ## ./rhw_getpages.d -c './main -s
 # call sys_map
 make rhw_getpages
+
+# 3. how to check the filesystem the system is using is UFS2
+ffs_valloc // sys/ufs/ffs/ffs_alloc.c
+-> fs->fs_magic == FS_UFS2_MAGIC
+dtrace -n 'ffs_valloc:entry {this->pvp = args[0]; this->pip=(struct inode*)this->pvp->v_data; this->ump=this->pip->i_ump; this->fs=this->ump->um_fs;printf("0x%x", this->fs->fs_magic);}' -c 'mount /dev/ada0p19 mnt' && umount mnt
+-------------------------------------------------------------------------
+dtrace: description 'ffs_valloc:entry ' matched 1 probe
+dtrace: pid 88254 has exited
+CPU     ID                    FUNCTION:NAME
+ 21 117485                 ffs_valloc:entry 0x19540119
+
+As we can see, the result of the command equals the value of FS_UFS2_MAGIC(0x19540119)--sys/ufs/ffs/fs.h
