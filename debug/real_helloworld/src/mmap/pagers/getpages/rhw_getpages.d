@@ -93,6 +93,10 @@ uiomove_fromphys:entry
 	/*trace(copyinstr((uintptr_t)self->iov_base));*/
 }
 
+vn_io_fault_pgmove:entry
+/execname == "main" && ffsread/
+{stack(1);}
+
 pmap_map_io_transient:entry
 /execname == "main" && ffsread/
 {
@@ -146,6 +150,10 @@ pmap_map_io_transient:return
 
 	/*trace(stringof(*self->pvaddr));*/
 }
+
+vn_io_fault_pgmove:return
+/execname == "main" && ffsread/
+{}
 
 uiomove_fromphys:return
 /execname == "main" && ffsread/
