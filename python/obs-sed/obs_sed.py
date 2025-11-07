@@ -2,6 +2,7 @@
 
 import sys
 import os
+import re
 import argparse
 import hashlib
 import subprocess
@@ -11,7 +12,7 @@ from hashlib import pbkdf2_hmac
 def usage():
     usage_info = '''
 Usage:
-    {dest} [subcommand] [<options>] [seed] [salt]
+    {dest} [subcommand] [<options>] [device | all]
 Subcommand:
     take_ownership          Claim drive for use by node
     release_ownership       Restore drive to factory default state
@@ -37,10 +38,46 @@ def derive_key(seed: str, salt: str, iterations: int = 100000):
     key_bytes = pbkdf2_hmac('sha256', seed.encode(), salt.encode(), iterations, dklen=32)
     return key_bytes.hex()
 
-def take_ownership(auth_key: str):
-    cmd = "sedutil-cli --initialSetup %s /dev/sdc" % auth_key
+def get_master_key():
+    tpm_random = exeshell("tpm2_getrandom --hex 32");
+    node_info = '123'
+    master_key = derive_key(tpm_random, node_info)
+    return master_key
 
+def get_auth_key(master_key: str, disk_sn: str):
+    auth_key = derive_key(master_key, disk_sn)
+    return auth_key
+
+def isValidSED(blkdev: str):
+    cmd = 'sedutil-cli --isValidSED %s' % blkdev
+    #print("cmd:",cmd);
+    result = exeshell(cmd)
+    #print("result:", result)
+    match = re.search(r'\bSED\b', result)
+    return True if match else False
+
+def get_sed_disks():
+    cmd = "cs_hal list disks"
+    result = exeshell(cmd)
+    lines = result.splitlines()
+    #print(lines)
+
+    sed_disks = {}
+    for line in lines:
+        if line.startswith('/dev/sg'):
+            parts = line.split()
+            #print("parts:", parts)
+            block_dev = parts[1]       # e.g. /dev/sdb
+            serial_num = parts[-2]     # e.g. X9A0A07TTNTF
+            if isValidSED(block_dev):
+                sed_disks[block_dev] = serial_num
+    return sed_disks
+
+
+def take_ownership(auth_key: str):
     print(f"Taking ownership with auth_key:{auth_key}")
+
+    cmd = "sedutil-cli --initialSetup %s /dev/sdc" % auth_key
     print(f"cmd:{cmd}")
     exeshell(cmd)
 
@@ -49,41 +86,53 @@ def release_ownership():
 
 def main():
 
-    #parser = argparse.ArgumentParser(
-    #    usage='%(prog)s [subcommand] [<options>] [seed] [salt]',
-    #    description='Example SED management tool.'
-    #)
-
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='subcommand', help='Subcommand')
 
     # take_ownership
     parser_take = subparsers.add_parser('take_ownership', help='Claim drive for use by node')
-    parser_take.add_argument('seed', help='Seed value')
-    parser_take.add_argument('salt', help='Salt value')
+    parser_take.add_argument('device', help='device')
+
+    # release_ownership
+    parser_rel = subparsers.add_parser('release_ownership', help='Restore drive to factory default state')
+    parser_rel.add_argument('device', help='device')
 
     args = parser.parse_args()
     if not args.subcommand:
         usage()
-        sys.exit(1)
+
+    sed_disks = get_sed_disks()
+    print("sed_disks:", sed_disks, "disks_list:", sed_disks.keys())
 
     if args.subcommand == 'take_ownership':
-        seed = args.seed
-        salt = args.salt
-        print(f"Seed: {seed} (type: {type(seed)})")
+        device = args.device
+        if not device == 'all' and not device in sed_disks :
+            print(
+                f"The value of device({device}) is either all,"
+                f"or this value is in the SED disks({sed_disks.keys()})"
+            )
+            usage()
 
-        master_key = derive_key(seed, salt)
-        print(f"seed:{seed} salt:{salt} master_key:{master_key}")
+        master_key = get_master_key()
+        auth_key = get_auth_key(master_key, sed_disks.get(device))
+
         print(f"master_key:{master_key} type:{type(master_key)}")
-
-        drv_sn = "12"
-        auth_key = derive_key(master_key, drv_sn)
+        print(f"sed_disks.get(device): {sed_disks.get(device)}")
         print(f"auth_key:{auth_key} type:{type(auth_key)}")
-        #take_ownership(auth_key)
+
+        take_ownership(auth_key)
+    elif args.subcommand == 'release_ownership':
+        device = args.device
+        if not device == 'all' and not device in sed_disks :
+            print(
+                f"The value of device({device}) is either all,"
+                f"or this value is in the SED disks({sed_disks.keys()})"
+            )
+            usage()
+        release_ownership()
     else:
         print(f"Unknown subcommand: {args.subcommand}")
         usage()
-        sys.exit(1)
 
     return 0;
 
