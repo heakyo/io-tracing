@@ -9,6 +9,7 @@ import subprocess
 
 from hashlib import pbkdf2_hmac
 
+########################### Usage ###########################
 def usage():
     usage_info = '''
 Usage:
@@ -22,6 +23,70 @@ Options:
     print(usage_info.format(dest=sys.argv[0]))
     sys.exit(1)
 
+def node_to_usage():
+    usage_info = '''\
+Usage:
+    {NODE} take_ownership [device | all]
+Opts:
+    -h, --help  Display this help
+    '''
+    print(usage_info.format(NODE = sys.argv[0]))
+    sys.exit(1)
+
+def node_ro_usage():
+    usage_info = '''\
+Usage:
+    {NODE} release_ownership [device | all]
+Opts:
+    -h, --help  Display this help
+    '''
+    print(usage_info.format(NODE = sys.argv[0]))
+    sys.exit(1)
+
+########################### Class ###########################
+class Node:
+    def __init__(self):
+        self._info = ''
+        self.sc_opts = {
+            #subcmd               #usage              #shortpts       #longopts
+            'take_ownership':     [node_to_usage,     'h',            ['help']],
+            'release_ownership':  [node_ro_usage,     'h',            ['help']]
+        }
+
+    def __str__(self):
+        return '{}()'.format(self.__class__.__name__)
+
+    @property
+    def info(self):
+        return self._info
+
+    @info.setter
+    def info(self, value):
+        if not value:
+            raise ValueError("node_info cannot be empty")
+        self._info = value
+
+class TPM:
+    pass
+
+class SED:
+
+    def __init__(self, blkdev):
+        self.blkdev = blkdev
+
+    def take_ownership(self, blkdev, auth_key):
+        print(f"Taking ownership with auth_key:{auth_key}")
+        cmd = "sedutil-cli --initialSetup %s %s" % (auth_key, blkdev)
+        print(f"cmd:{cmd}")
+        exeshell(cmd)
+
+    def release_ownership(self, blkdev, auth_key):
+        print(f"Releasing ownership")
+        cmd = "sedutil-cli --revertTPer %s %s" % (auth_key, blkdev)
+        print(f"cmd:{cmd}")
+        exeshell(cmd)
+
+########################### Utility ###########################
 def exeshell(cmd, check=True):
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     s = result.returncode
@@ -88,30 +153,41 @@ def release_ownership(device: str, auth_key: str):
     print(f"cmd:{cmd}")
     exeshell(cmd)
 
-def main():
+def set_args(parser: argparse.ArgumentParser, node: Node):
 
-    tpm2_nvindex = 0x1500016
-    master_key=''
-
-    parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='subcommand', help='Subcommand')
-
-    # take_ownership
-    parser_take = subparsers.add_parser('take_ownership', help='Claim drive for use by node')
-    parser_take.add_argument('device', help='device')
-
-    # release_ownership
-    parser_rel = subparsers.add_parser('release_ownership', help='Restore drive to factory default state')
-    parser_rel.add_argument('device', help='device')
+    for item in node.sc_opts.items():
+        subcmd, subfunc = item[0], item[1][0]
+        print(subcmd, subfunc)
+        subparser = subparsers.add_parser(subcmd, help=subfunc)
+        subparser.add_argument('device', help='device')
 
     # test
     parser_rel = subparsers.add_parser('test', help='Restore drive to factory default state')
     parser_rel.add_argument('device', help='device')
 
+def system_check():
+    # Check if the system has TPM
+    try:
+        exeshell('ls /sys/class/tpm/')
+    except SystemExit as e:
+        print(f"Unexpected error: {type(e).__name__}: {e}")
+        usage()
+
+def main():
+    node = Node()
+
+    tpm2_nvindex = 0x1500016
+    master_key=''
+
+    parser = argparse.ArgumentParser()
+    set_args(parser, node)
+
     args = parser.parse_args()
     if not args.subcommand:
         usage()
 
+    system_check()
     sed_disks = get_sed_disks()
     print("sed_disks:", sed_disks, "disks_list:", sed_disks.keys())
 
@@ -133,49 +209,44 @@ def main():
     else:
         # Read the key from TPM
         cmd = 'tpm2_nvread 0x%x -C o -s 32 | xxd -p -c 64' % tpm2_nvindex
-        print(f"tpm cmd:{cmd}")
-        master_key = exeshell(cmd)
-        print(f"master_key:{master_key} type:{type(master_key)}")
+        #print(f"tpm cmd:{cmd}")
+        try:
+            master_key = exeshell(cmd)
+        except SystemExit as e:
+            print(f"Unexpected error: {type(e).__name__}: {e}")
+            #print(f"master_key:{master_key} type:{type(master_key)}")
 
     if args.subcommand == 'release_owership':
         cmd = 'tpm2_nvundefine 0x%x' % tpm2_nvindex
         exeshell(cmd)
 
+    sedisk = SED(args.device)
+    if not sedisk.blkdev == 'all' and not sedisk.blkdev in sed_disks :
+        print(
+            f"The value of device({sedisk.blkdev}) is either all,"
+            f"or this value is in the SED disks({sed_disks.keys()})"
+        )
+        usage()
+
+    auth_key = get_auth_key(master_key, sed_disks.get(sedisk.blkdev))
+
     if args.subcommand == 'take_ownership':
-        device = args.device
-        if not device == 'all' and not device in sed_disks :
-            print(
-                f"The value of device({device}) is either all,"
-                f"or this value is in the SED disks({sed_disks.keys()})"
-            )
-            usage()
 
-        auth_key = get_auth_key(master_key, sed_disks.get(device))
-
-        print(f"sed_disks.get(device): {sed_disks.get(device)}")
+        print(f"sed_disks.get(device): {sed_disks.get(sedisk.blkdev)}")
         print(f"auth_key:{auth_key} type:{type(auth_key)}")
 
-        take_ownership(device, auth_key)
+        take_ownership(sedisk.blkdev, auth_key)
 
     elif args.subcommand == 'release_ownership':
-        device = args.device
-        if not device == 'all' and not device in sed_disks :
-            print(
-                f"The value of device({device}) is either all,"
-                f"or this value is in the SED disks({sed_disks.keys()})"
-            )
-            usage()
-
-        auth_key = get_auth_key(master_key, sed_disks.get(device))
-        release_ownership(device, auth_key)
+        release_ownership(sedisk.blkdev, auth_key)
 
         cmd = 'tpm2_nvundefine 0x%x' % tpm2_nvindex
         print(f"tpm cmd:{cmd}")
         exeshell(cmd)
+
     elif args.subcommand == 'test':
-        device = args.device
-        auth_key = get_auth_key('40c818669e6b605d0b65af52e59177857bb3f72ed4bcf216495e6bc8a4eb\n8eca', sed_disks.get(device))
-        print(f"auth_key:{auth_key} type:{type(auth_key)}")
+        node.info = '123'
+        print(f"Node:{node.info}")
     else:
         print(f"Unknown subcommand: {args.subcommand}")
         usage()
