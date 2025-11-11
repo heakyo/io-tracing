@@ -13,69 +13,34 @@ import abc
 
 from hashlib import pbkdf2_hmac
 
-########################### Usage ###########################
+########################### Usage Info ###########################
 def usage():
-    usage_info = '''
-Usage:
-    {dest} [subcommand] [<options>] [blkdev | all]
-Subcommand:
-    take_ownership          Claim drive for use by node
-    release_ownership       Restore drive to factory default state
-Options:
-    --psid [PSID]           PSID value
-    '''
-    print(usage_info.format(dest=sys.argv[0]))
+    argparse.ArgumentParser()
     sys.exit(1)
 
 def node_to_usage():
-    usage_info = '''\
-Usage:
-    {NODE} take_ownership [blkdev | all]
-Opts:
-    -h, --help  Display this help
-    '''
-    print(usage_info.format(NODE = sys.argv[0]))
-    sys.exit(1)
+    usage_info = 'Claim drive for use by node'
+    return usage_info
 
 def node_ro_usage():
-    usage_info = '''\
-Usage:
-    {NODE} release_ownership [blkdev | all]
-Opts:
-    -h, --help  Display this help
-    '''
-    print(usage_info.format(NODE = sys.argv[0]))
-    sys.exit(1)
+    usage_info = 'Restore drive to factory default state'
+    return usage_info
 
 def node_lr_usage():
-    usage_info = '''\
-Usage:
-    {NODE} lock_range [blkdev | all]
-Opts:
-    -h, --help  Display this help
-    '''
-    print(usage_info.format(NODE = sys.argv[0]))
-    sys.exit(1)
+    usage_info = 'Lock drive ranges, preventing access'
+    return usage_info
 
 def node_ur_usage():
-    usage_info = '''\
-Usage:
-    {NODE} unlock_range [blkdev | all]
-Opts:
-    -h, --help  Display this help
-    '''
-    print(usage_info.format(NODE = sys.argv[0]))
-    sys.exit(1)
+    usage_info = 'Unlock drive ranges using authentication'
+    return usage_info
 
 def node_llr_usage():
-    usage_info = '''\
-Usage:
-    {NODE} list_locking_range [blkdev | all]
-Opts:
-    -h, --help  Display this help
-    '''
-    print(usage_info.format(NODE = sys.argv[0]))
-    sys.exit(1)
+    usage_info = 'List drive ranges'
+    return usage_info
+
+def node_rfd_usage():
+    usage_info = '*Revert to factory default state --- TODO'
+    return usage_info
 
 ########################### Class ###########################
 ### Node ###
@@ -87,12 +52,26 @@ class Node:
         self.sedisks = list()           # all SED on the system
         self.sedisks_pending = list()   # all SED needed to process
         self.sc_opts = {
-            #subcmd               #usage              #shortpts       #longopts
-            'take_ownership':     [node_to_usage,     'h',            ['help']],
-            'release_ownership':  [node_ro_usage,     'h',            ['help']],
-            'lock_range':         [node_lr_usage,     'h',            ['help']],
-            'unlock_range':       [node_ur_usage,     'h',            ['help']],
-            'list_locking_range': [node_llr_usage,    'h',            ['help']]
+            #subcmd                 #usage              #option
+            'take_ownership':       [node_to_usage(),   {
+                                                          'blkdev': ['block device (e.g. /dev/sda)', False]
+                                                        }],
+            'release_ownership':    [node_ro_usage(),   {
+                                                          'blkdev': ['block device (e.g. /dev/sda)', False]
+                                                        }],
+            'lock_range':           [node_lr_usage(),   {
+                                                          'blkdev': ['block device (e.g. /dev/sda)', False]
+                                                        }],
+            'unlock_range':         [node_ur_usage(),   {
+                                                          'blkdev': ['block device (e.g. /dev/sda)', False]
+                                                        }],
+            'list_locking_range':   [node_llr_usage(),  {
+                                                          'blkdev': ['block device (e.g. /dev/sda)', False]
+                                                        }],
+            'revert_default':       [node_rfd_usage(),  {
+                                                          'blkdev': ['block device (e.g. /dev/sda)', False],
+                                                          '--psid': ['PSID value',                   True]
+                                                        }]
         }
         self.fetch_sedisks()
 
@@ -148,6 +127,7 @@ class Node:
             )
             usage()
 
+    # TPM Specific
     def tpm_create_space(self):
         self.tpm.create_space()
 
@@ -158,10 +138,26 @@ class Node:
         try:
             self.__master_key = self.tpm.read_key()
         except TPMKeyNotFoundError:
-            raise TPMKeyNotFoundError()
+            raise TPMKeyNotFoundError(f"Key is not found in the TPM")
 
     def tpm_write_key(self):
         self.tpm.write_key(self.__master_key)
+
+    # SED Specific
+    def take_ownership(self, sedisk):
+        sedisk.sedcli.take_ownership(sedisk.get_auth_key(), sedisk.blkdev)
+
+    def release_ownership(self, sedisk):
+        sedisk.sedcli.release_ownership(sedisk.get_auth_key(), sedisk.blkdev)
+
+    def lock_range(self, sedisk):
+        sedisk.sedcli.lock_range(sedisk.get_auth_key(), sedisk.blkdev)
+
+    def unlock_range(self, sedisk):
+        sedisk.sedcli.unlock_range(sedisk.get_auth_key(), sedisk.blkdev)
+
+    def list_locking_range(self, sedisk):
+        sedisk.sedcli.list_locking_range(sedisk.get_auth_key(), sedisk.blkdev)
 
     @property
     def info(self):
@@ -172,6 +168,13 @@ class Node:
         if not value:
             raise ValueError("node_info cannot be empty")
         self._info = value
+
+    def do_subcmd(self, subcmd):
+        # SED Specific
+        for sedisk in self.sedisks_pending:
+            sedisk.set_auth_key(self.gen_auth_key(sedisk.sn))
+            print(f"SED:{sedisk} auth_key:{sedisk.get_auth_key()}")
+            getattr(self, subcmd)(sedisk)
 
 ### TPM ###
 class TPMKeyNotFoundError(Exception):
@@ -257,9 +260,9 @@ class SEDUtil(SEDCLI):
 
     def list_locking_range(self, auth_key, blkdev):
         cmd = "sedutil-cli --listLockingRange 0 %s %s" % (auth_key, blkdev)
-        return exeshell(cmd)
+        print(exeshell(cmd))
 
-### SEDLib ###
+### SEDLib -- TODO ###
 class SEDLib(SEDCLI):
     pass
 
@@ -270,24 +273,31 @@ class SED:
         self.blkdev = blkdev
         self.sn = sn
         self.sedcli = sedcli
+        self.__auth_key = str()
 
     def __str__(self):
         return '{}:{}'.format(self.blkdev, self.sn)
 
-    def take_ownership(self, auth_key):
-        self.sedcli.take_ownership(auth_key, self.blkdev)
+    def set_auth_key(self, auth_key):
+        self.__auth_key = auth_key
 
-    def release_ownership(self, auth_key):
-        self.sedcli.release_ownership(auth_key, self.blkdev)
+    def get_auth_key(self):
+        return self.__auth_key
 
-    def lock_range(self, auth_key):
-        self.sedcli.lock_range(auth_key, self.blkdev)
+    def take_ownership(self):
+        self.sedcli.take_ownership(self.__auth_key, self.blkdev)
 
-    def unlock_range(self, auth_key):
-        self.sedcli.unlock_range(auth_key, self.blkdev)
+    def release_ownership(self):
+        self.sedcli.release_ownership(self.__auth_key, self.blkdev)
 
-    def list_locking_range(self, auth_key):
-        return self.sedcli.list_locking_range(auth_key, self.blkdev)
+    def lock_range(self):
+        self.sedcli.lock_range(self.__auth_key, self.blkdev)
+
+    def unlock_range(self):
+        self.sedcli.unlock_range(self.__auth_key, self.blkdev)
+
+    def list_locking_range(self):
+        self.sedcli.list_locking_range(self.__auth_key, self.blkdev)
 
 ########################### Utility ###########################
 def handler(signum, frame):
@@ -321,16 +331,12 @@ def exeshell(cmd, check=True):
 
 ########################### Subcommand ###########################
 def set_args(parser: argparse.ArgumentParser, node: Node):
-
-    subparsers = parser.add_subparsers(dest='subcommand', help='Subcommand')
-    for item in node.sc_opts.items():
-        subcmd, subfunc = item[0], item[1][0]
-        subparser = subparsers.add_parser(subcmd, help=subfunc)
-        subparser.add_argument('blkdev', help='blkdev')
-
-    # Just for test
-    parser_rel = subparsers.add_parser('test', help='Restore drive to factory default state')
-    parser_rel.add_argument('blkdev', help='blkdev')
+    # SED specific
+    subparsers = parser.add_subparsers(dest='subcommand', help='Available subcommands')
+    for subcmd, subhelp in node.sc_opts.items():
+        subparser = subparsers.add_parser(subcmd, help=subhelp[0])
+        for k,v in subhelp[1].items():
+            subparser.add_argument(k, help=v[0])
 
 def chk_args(parser: argparse.ArgumentParser, node: Node):
     args = parser.parse_args()
@@ -345,33 +351,8 @@ def system_chker():
         print(f"Unexpected error: {type(e).__name__}: {e}")
         usage()
 
-def do_subcmd(subcmd, node):
-
-    for sedisk in node.sedisks_pending:
-        auth_key = node.gen_auth_key(sedisk.sn)
-        print(f"SED:{sedisk} auth_key:{auth_key}")
-
-        match subcmd:
-            case 'take_ownership':
-                sedisk.take_ownership(auth_key)
-            case 'release_ownership':
-                sedisk.release_ownership(auth_key)
-                node.tpm.destroy_space()
-            case 'lock_range':
-                sedisk.lock_range(auth_key)
-            case 'unlock_range':
-                sedisk.unlock_range(auth_key)
-            case 'list_locking_range':
-                print(sedisk.list_locking_range(auth_key))
-            case 'test': # Just for test
-                print(f"Test")
-            case _:
-                print(f"Unknown subcommand: {args.subcommand}")
-                usage()
-
 ########################### Main Entry ###########################
 def main():
-
     system_chker()
 
     node = Node(TPM())
@@ -380,19 +361,22 @@ def main():
     set_args(parser, node)
     chk_args(parser, node)
 
+    subcmd = parser.parse_args().subcommand
     blkdev = parser.parse_args().blkdev
     node.fetch_sedisks_pending(blkdev)
 
     try:
         node.tpm_read_key();
-    except:
-        print("Generate master key......")
+    except TPMKeyNotFoundError as e:
+        print(f"Generate master key because {e}")
         node.gen_master_key()
         node.tpm_create_space()
         node.tpm_write_key()
+    except:
+        print(f"Unexpected error: {type(e).__name__}: {e}");
+        usage()
     finally:
-        subcmd = parser.parse_args().subcommand
-        do_subcmd(subcmd, node)
+        node.do_subcmd(subcmd)
 
     return 0;
 
