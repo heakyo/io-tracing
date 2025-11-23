@@ -1,0 +1,26 @@
+Current Dir: /root/real_helloworld/src/mmap/pagers/mount/
+
+# Create a 100M file
+truncate -s 100M ufs.img
+dd if=/dev/zero of=ufs.img bs=1M count=100
+
+# Check existing devices
+mdconfig -l
+---------------------------------------
+md8 md0 md1 md2 md3 md4 md5 md6 md7
+
+# Attach the file as an md device
+mdconfig -a -t vnode -f ufs.img
+---------------------------------------
+md9
+
+# Create a UFS filesystem (UFS2 by default
+newfs -U /dev/md9
+
+# Mount the new UFS filesystem
+mkdir /mnt/ufsimg
+mount /dev/md9 /root/real_helloworld/src/mmap/pagers/mount/ufsimg
+
+# Unmount and detach when done
+umount /root/real_helloworld/src/mmap/pagers/mount/ufsimg
+mdconfig -d -u 9
