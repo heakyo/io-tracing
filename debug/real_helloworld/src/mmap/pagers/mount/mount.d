@@ -15,6 +15,31 @@ BEGIN
 	/* @[stack()] = count() */
 	printf("-----IO Tracing Start-----");
 }
+
+/*User Space*************************************************************************************/
+pid$target:mount:mount_fs:entry
+/execname == procname/
+{
+	this->td = curthread;
+
+	printf("---User Space---:%s", probename);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("td:%p", this->td);
+	printf("\n\t\t\t\t\t      ");
+
+	this->pwd = (struct pwd *)this->td->td_proc->p_fd->fd_pwd.__ptr;
+	printf("pwd:pwd_rdir:%p", this->pwd->pwd_rdir);
+}
+
+/*return*************************************************************************************/
+pid$target:mount:mount_fs:return
+/execname == procname/
+{
+	printf("---User Space---:%s", probename);
+}
+
+/*Kernel Space*************************************************************************************/
 /*common*************************************************************************************/
 fdinit:*
 /execname == procname && ffsmnt/

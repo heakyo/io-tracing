@@ -1,5 +1,8 @@
 Current Dir: /root/real_helloworld/src/mmap/pagers/mount/
 
+# Dtrace Test Command
+umount ufsimg && ./mount.d -c 'mymount /dev/md9 ufsimg'
+
 # Create a 100M file
 truncate -s 100M ufs.img
 dd if=/dev/zero of=ufs.img bs=1M count=100
