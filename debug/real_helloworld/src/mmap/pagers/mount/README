@@ -24,3 +24,10 @@ mount /dev/md9 /root/real_helloworld/src/mmap/pagers/mount/ufsimg
 # Unmount and detach when done
 umount /root/real_helloworld/src/mmap/pagers/mount/ufsimg
 mdconfig -d -u 9
+
+Debug
+# mymount
+gdb -q -args mymount /dev/md9 ufsimg
+
+# dtrace
+umount ufsimg && ./mount.d -c 'mymount /dev/md9 ufsimg'
