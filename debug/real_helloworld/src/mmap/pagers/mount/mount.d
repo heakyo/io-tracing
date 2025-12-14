@@ -68,7 +68,7 @@ ffs_mount:entry
 {
 	trace(probename);
 
-	stack();
+	/*stack();*/
 
 	ffsmnt = 1;
 }
@@ -87,8 +87,26 @@ namei_handle_root:entry
 	printf("cnp:nameptr:%s", stringof(this->cnp->cn_nameptr));
 	printf("\n\t\t\t\t\t      ");
 
-	printf("ndp:rootdir:%p", this->ndp->ni_rootdir);
+	this->rootdir = this->ndp->ni_rootdir;
+	printf("ndp:rootdir:%p", this->rootdir);
 	printf("\n\t\t\t\t\t      ");
+
+/*****************************vnode*************************************/
+	printf("rootdir:tag:%s type:%d",
+		stringof(this->rootdir->v_tag),
+		this->rootdir->v_type
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/*****************************inode*************************************/
+	this->inode = (struct inode*)this->rootdir->v_data;
+	printf("inode:number:%d",
+		this->inode->i_number
+		);
+
+	printf("\n\t\t\t\t\t      ");
+
+/*****************************mount*************************************/
 
 	printf("td:td_proc->p_fd->fd_pwd.__ptr:%p",
 		curthread->td_proc->p_fd->fd_pwd.__ptr
@@ -97,6 +115,8 @@ namei_handle_root:entry
 
 	this->pwd = (struct pwd *)curthread->td_proc->p_fd->fd_pwd.__ptr;
 	printf("pwd:pwd_rdir:%p", this->pwd->pwd_rdir);
+
+	stack();
 }
 
 mountcheckdirs:entry
