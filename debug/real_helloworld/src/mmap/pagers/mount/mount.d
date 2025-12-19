@@ -9,11 +9,15 @@
 
 BEGIN
 {
+	rootvnodep = (struct vnode **)0xffffffff83df5740;
+
 	procname = "mount";
 	ffsmnt = 0;
 
 	/* @[stack()] = count() */
 	printf("-----IO Tracing Start-----");
+	printf("\n\t\t\t\t\t      ");
+	printf("rootvnode:%p", *rootvnodep);
 }
 
 /*User Space*************************************************************************************/
@@ -66,7 +70,11 @@ sys_nmount:entry
 ffs_mount:entry
 /execname == procname/
 {
-	trace(probename);
+	this->mp = args[0];
+
+	printf("mp:rootvnode:%p",
+		this->mp->mnt_rootvnode
+		);
 
 	/*stack();*/
 
@@ -75,7 +83,14 @@ ffs_mount:entry
 
 namei:entry
 /execname == procname && ffsmnt/
-{}
+{
+	this->ndp = args[0];
+
+	printf("ndp:0x%p vp:%p",
+		this->ndp,
+		this->ndp->ni_vp
+		);
+}
 
 namei_handle_root:entry
 /execname == procname && ffsmnt/
@@ -135,7 +150,12 @@ namei_handle_root:return
 
 namei:return
 /execname == procname && ffsmnt/
-{}
+{
+	printf("ndp:0x%p vp:%p",
+		this->ndp,
+		this->ndp->ni_vp
+		);
+}
 
 ffs_mount:return
 /execname == procname/
