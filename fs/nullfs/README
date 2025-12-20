@@ -1,0 +1,4 @@
+# 1. The process of reading a file in the filesystem
+make mount-nullfs
+make read-file
+make umount-nullfs
