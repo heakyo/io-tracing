@@ -134,13 +134,29 @@ namei_handle_root:entry
 	stack();
 }
 
-mountcheckdirs:entry
+ffs_mountfs:entry
 /execname == procname/
 {
+	this->fm_devvp = args[0];
+	this->fm_mp = args[1];
+
+/*****************************dev vnode*************************************/
+	printf("devvp:tag:%s type:%d",
+		stringof(this->fm_devvp->v_tag),
+		this->fm_devvp->v_type
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/*****************************cdev*************************************/
+	this->dev = this->fm_devvp->v_rdev;
+	printf("dev:name:%s",
+		this->dev->si_name
+		);
+	printf("\n\t\t\t\t\t      ");
 }
 
 /*return*************************************************************************************/
-mountcheckdirs:return
+ffs_mountfs:return
 /execname == procname/
 {}
 
