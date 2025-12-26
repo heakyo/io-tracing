@@ -167,10 +167,31 @@ namei_handle_root:return
 namei:return
 /execname == procname && ffsmnt/
 {
-	printf("ndp:0x%p vp:%p",
-		this->ndp,
-		this->ndp->ni_vp
-		);
+        printf("%s---------", probename);
+        printf("\n\t\t\t\t\t      ");
+
+        printf("ndp:ni_vp:%p",
+                this->ndp->ni_vp
+                );
+
+        printf("\n\t\t\t\t\t      ");
+        this->ret_ni_vp = this->ndp->ni_vp;
+        printf("ret_ni_vp:");
+
+/*****************************vnode*************************************/
+        printf("ni_vp:tag:%s type:%d",
+                stringof(this->ret_ni_vp->v_tag),
+                this->ret_ni_vp->v_type
+                );
+        printf("\n\t\t\t\t\t      ");
+
+/*****************************inode*************************************/
+        this->inode = (struct inode*)this->ret_ni_vp->v_data;
+        printf("inode:number:%d",
+                this->inode->i_number
+                );
+
+        printf("\n\t\t\t\t\t      ");
 }
 
 ffs_mount:return
