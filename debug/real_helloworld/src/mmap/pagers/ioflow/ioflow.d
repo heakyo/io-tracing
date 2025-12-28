@@ -92,6 +92,10 @@ namei:entry
 	/*stack();*/
 }
 
+ufs_strategy:entry
+/execname == procname/
+{}
+
 namei_handle_root:entry
 /execname == procname/
 {
@@ -135,6 +139,10 @@ namei_handle_root:entry
 /*return*************************************************************************************/
 
 namei_handle_root:return
+/execname == procname/
+{}
+
+ufs_strategy:entry
 /execname == procname/
 {}
 
