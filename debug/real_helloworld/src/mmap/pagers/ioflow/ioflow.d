@@ -3,6 +3,7 @@
 /*
  * test command:
  * 	./ioflow.d -c 'cat ../mount/ufsimg/ufstest'
+ * 	./ioflow.d -c './main'
  */
 
 #pragma D option flowindent
@@ -11,8 +12,10 @@ BEGIN
 {
 	rootvnodep = (struct vnode **)0xffffffff83df5740;
 
-	procname = "cat";
+	/*procname = "cat";*/
+	procname = "main";
 	ufsopen = 0;
+	nameiflag = 0;
 
 	/* @[stack()] = count() */
 	printf("-----IO Tracing Start-----");
@@ -89,12 +92,91 @@ namei:entry
                 );
         printf("\n\t\t\t\t\t      ");
 
+	nameiflag = 1;
+
 	/*stack();*/
 }
 
-ufs_strategy:entry
-/execname == procname/
+ufs_lookup:entry
+/execname == procname && nameiflag/
 {}
+
+breadn_flags:entry
+/execname == procname && nameiflag/
+{}
+
+getblkx:entry
+/execname == procname && nameiflag/
+{
+	self->bpp = args[6];
+
+	printf("bp:*bpp:0x%p",
+		*self->bpp
+		);
+}
+
+getnewbuf:entry
+/execname == procname && nameiflag/
+{}
+
+bstrategy:entry
+/execname == procname && nameiflag/
+{}
+
+ufs_strategy:entry
+/execname == procname && nameiflag/
+{
+	this->ufs_s_ap = args[0];
+
+	self->bp = this->ufs_s_ap->a_bp;
+
+	printf("bp:iooffset:0x%x offset:0x%x",
+		self->bp->b_iooffset,
+		self->bp->b_offset
+		);
+}
+
+ufs_bmaparray:entry
+/execname == procname && nameiflag/
+{
+	this->vp = args[0];
+	self->blknop = args[2];
+	this->bp = args[3];
+
+/*****************************vnode*************************************/
+	printf("vp(0x%p):tag:%s type:%d",
+		this->vp,
+		stringof(this->vp->v_tag),
+		this->vp->v_type
+		);
+	printf("\n\t\t\t\t\t      ");
+
+/*****************************inode*************************************/
+	this->inode = (struct inode*)this->vp->v_data;
+	printf("inode:number:%d",
+		this->inode->i_number
+		);
+
+	printf("\n\t\t\t\t\t      ");
+
+/*****************************buf*************************************/
+	printf("bp(0x%p): blkno:0x%x lblkno:0x%x",
+		this->bp,
+		this->bp->b_blkno,
+		this->bp->b_lblkno
+		);
+}
+
+ffs_geom_strategy:entry
+/execname == procname && nameiflag/
+{
+	self->bp = args[1];
+
+	printf("bp:iooffset:0x%x offset:0x%x",
+		self->bp->b_iooffset,
+		self->bp->b_offset
+	);
+}
 
 namei_handle_root:entry
 /execname == procname/
@@ -142,8 +224,68 @@ namei_handle_root:return
 /execname == procname/
 {}
 
-ufs_strategy:entry
-/execname == procname/
+ffs_geom_strategy:return
+/execname == procname && nameiflag/
+{
+	printf("bp:iooffset:0x%x offset:0x%x",
+		self->bp->b_iooffset,
+		self->bp->b_offset
+	);
+}
+
+ufs_bmaparray:return
+/execname == procname && nameiflag/
+{
+        printf("%s---------", probename);
+        printf("\n\t\t\t\t\t      ");
+
+	printf("blkno:0x%x",
+		*self->blknop
+		);
+}
+
+ufs_strategy:return
+/execname == procname && nameiflag/
+{
+        printf("%s---------", probename);
+        printf("\n\t\t\t\t\t      ");
+
+	printf("bp:iooffset:0x%x offset:0x%x",
+		self->bp->b_iooffset,
+		self->bp->b_offset
+		);
+}
+
+bstrategy:return
+/execname == procname && nameiflag/
+{}
+
+getnewbuf:return
+/execname == procname && nameiflag/
+{}
+
+getblkx:return
+/execname == procname && nameiflag/
+{
+
+	this->bp = *self->bpp;
+
+        printf("%s---------", probename);
+        printf("\n\t\t\t\t\t      ");
+
+	printf("bp:0x%p flags:0x%x",
+		this->bp,
+		this->bp->b_flags
+		);
+}
+
+breadn_flags:return
+/execname == procname && nameiflag/
+{
+}
+
+ufs_lookup:return
+/execname == procname && nameiflag/
 {}
 
 namei:return
@@ -159,8 +301,14 @@ namei:return
                 );
         printf("\n\t\t\t\t\t      ");
 
-/*****************************vnode*************************************/
         this->ret_ni_vp = this->ndp->ni_vp;
+
+	printf("ni_vp:%p", this->ret_ni_vp);
+        printf("\n\t\t\t\t\t      ");
+
+if (this->ret_ni_vp) {
+
+/*****************************vnode*************************************/
         printf("ni_vp:tag:%s type:%d",
                 stringof(this->ret_ni_vp->v_tag),
                 this->ret_ni_vp->v_type
@@ -175,27 +323,27 @@ namei:return
         printf("\n\t\t\t\t\t      ");
 
 /*****************************mount*************************************/
-	this->mount = this->ret_ni_vp->v_mount;
-	printf("mount:0x%p vnodecovered:0x%p",
-		this->mount,
-		this->mount->mnt_vnodecovered
-	);
+        this->mount = this->ret_ni_vp->v_mount;
+        printf("mount:0x%p vnodecovered:0x%p",
+                this->mount,
+                this->mount->mnt_vnodecovered
+        );
         printf("\n\t\t\t\t\t      ");
 
-	this->mnt_data = (struct ufsmount*)this->mount->mnt_data;
-	this->ufsmnt = this->mnt_data;
-	printf("ufsmnt:mountp:0x%p",
-		this->ufsmnt->um_mountp
-	);
+        this->mnt_data = (struct ufsmount*)this->mount->mnt_data;
+        this->ufsmnt = this->mnt_data;
+        printf("ufsmnt:mountp:0x%p",
+                this->ufsmnt->um_mountp
+        );
         printf("\n\t\t\t\t\t      ");
 
-	this->um_dev = this->ufsmnt->um_dev;
-	printf("cdev:si_name:%s",
-		this->um_dev->si_name
-		);
+        this->um_dev = this->ufsmnt->um_dev;
+        printf("cdev:si_name:%s",
+                this->um_dev->si_name
+                );
         printf("\n\t\t\t\t\t      ");
 
-	this->um_devvp = this->ufsmnt->um_devvp;
+        this->um_devvp = this->ufsmnt->um_devvp;
         printf("um_devvp:tag:%s type:%d",
                 stringof(this->um_devvp->v_tag),
                 this->um_devvp->v_type
@@ -203,12 +351,16 @@ namei:return
         printf("\n\t\t\t\t\t      ");
 
 /*****************************vnodecovered*************************************/
-	this->vnodecovered = this->mount->mnt_vnodecovered;
+        this->vnodecovered = this->mount->mnt_vnodecovered;
         printf("vpcovered:tag:%s type:%d",
                 stringof(this->vnodecovered->v_tag),
                 this->vnodecovered->v_type
                 );
         printf("\n\t\t\t\t\t      ");
+
+} /* this->ret_ni_bp */
+
+	nameiflag = 0;
 }
 
 ufs_open:return
