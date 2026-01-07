@@ -16,9 +16,11 @@ def print_event(cpu, data, size):
     time_s = (float(event.ts - start)) / 1000000000
     print("%-18.9f %-16s %-6d %-16s" % (time_s, event.comm, event.pid, event.fname))
 
+# loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
     try:
+        # The function print_event will be called in perf_buffer_poll
         b.perf_buffer_poll()
     except KeyboardInterrupt:
         exit()
