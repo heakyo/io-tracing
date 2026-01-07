@@ -1,0 +1,7 @@
+# Install packages of eBPF
+zypper install -y bcc-tools
+
+# Verify if it works
+python3 -c "from bcc import BPF; print('bcc import ok')"
+---------------------------------------------------------------
+bcc import ok
