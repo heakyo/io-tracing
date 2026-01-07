@@ -10,6 +10,9 @@ struct data_t {
 
 /*
  * Creates a BPF table for pushing out custom event data to user space via a perf ring buffer.
+ * Define an perf event
+ *
+ * Perf event is like a train or truck which is responsible for carrying data to user space
  */
 BPF_PERF_OUTPUT(events);
 
@@ -17,16 +20,18 @@ int hello_world(struct pt_regs *ctx, int dfd, const char __user * filename, stru
 {
 	struct data_t data = {}; // "struct data_t data;" is wrong
 
+    /*
+     * Collect data
+     */
 	data.pid = bpf_get_current_pid_tgid();
 	data.ts = bpf_ktime_get_ns();
-
 	if (!bpf_get_current_comm(&data.comm, sizeof(data.comm)))
 		bpf_probe_read_user(&data.fname, sizeof(data.fname), (void *)filename);
 
 	/*
 	 * https://github.com/iovisor/bcc/blob/master/docs/reference_guide.md#output
 	 *
-	 * Submit custom event data to user space
+	 * Submit data to user space
 	 */
 	events.perf_submit(ctx, &data, sizeof(data));
 
