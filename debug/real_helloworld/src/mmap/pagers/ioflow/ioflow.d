@@ -13,7 +13,8 @@ BEGIN
 	rootvnodep = (struct vnode **)0xffffffff83df5740;
 
 	/*procname = "cat";*/
-	procname = "main";
+	/*procname = "main";*/
+	procname = "rm";
 	ufsopen = 0;
 	nameiflag = 0;
 
@@ -218,7 +219,44 @@ namei_handle_root:entry
 	printf("pwd:pwd_rdir:%p", this->pwd->pwd_rdir);
 }
 
+/*remove a file*/
+isi_kern_unlinkat:entry
+/execname == procname/
+{}
+
+ffs_truncate:entry,
+vtruncbuf:entry,
+ufs_remove:entry,
+ufs_inactive:entry
+/execname == procname/
+{}
+
+bufobj_wwait:entry
+/execname == procname/
+{
+	this->bo = args[0];
+
+	printf("bo:0x%p numoutput:%d",
+		this->bo,
+		this->bo->bo_numoutput
+		);
+}
+
 /*return*************************************************************************************/
+bufobj_wwait:return
+/execname == procname/
+{}
+
+ffs_truncate:return,
+vtruncbuf:return,
+ufs_remove:return,
+ufs_inactive:return
+/execname == procname/
+{}
+
+isi_kern_unlinkat:return
+/execname == procname/
+{}
 
 namei_handle_root:return
 /execname == procname/
@@ -304,8 +342,6 @@ namei:return
         this->ret_ni_vp = this->ndp->ni_vp;
 
 	printf("ni_vp:%p", this->ret_ni_vp);
-        printf("\n\t\t\t\t\t      ");
-
 if (this->ret_ni_vp) {
 
 /*****************************vnode*************************************/
