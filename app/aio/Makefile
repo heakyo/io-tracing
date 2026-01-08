@@ -1,7 +1,7 @@
 CFLAGS = -O0 -g
 LDFLAGS = -laio
 
-all: main
+all: main pwritev
 	objdump -dS main > main.dis
 
 install:
@@ -10,10 +10,13 @@ install:
 uninstall:
 	rm /usr/local/bin/main
 
+pwritev: pwritev.o
+	@ $(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+
 main: main.o
 	@ $(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-main.o: main.i
+%.o: %.i
 	@ $(CC) $(CFLAGS) -c -o $@ $<
 
 %.i: %.c
