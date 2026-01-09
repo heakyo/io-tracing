@@ -13,8 +13,8 @@ BEGIN
 	rootvnodep = (struct vnode **)0xffffffff83df5740;
 
 	/*procname = "cat";*/
-	/*procname = "main";*/
-	procname = "rm";
+	procname = "main";
+	/*procname = "rm";*/
 	ufsopen = 0;
 	nameiflag = 0;
 
@@ -242,7 +242,131 @@ bufobj_wwait:entry
 		);
 }
 
+ufs_create:entry
+/execname == procname/
+{}
+
+ufs_makeinode:entry
+/execname == procname/
+{}
+
+ffs_valloc:entry
+/execname == procname/
+{}
+
+ffs_vgetf:entry
+/execname == procname/
+{}
+
+ffs_load_inode:entry
+/execname == procname/
+{
+	this->bp = args[0];
+	this->ip = args[1];
+	this->ino = args[3];
+
+	printf("ino:%d",
+		this->ino
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("bp:data:0x%p",
+		this->bp->b_data
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->din2 = ((struct ufs2_dinode *)this->bp->b_data + this->ino);
+	printf("din2:size:%d",
+		this->din2->di_size
+		);
+
+}
+
+ffs_update:entry
+/execname == procname/
+{
+	this->vp = args[0];
+	this->waitfor = args[1];
+
+	printf("vp:0x%p waitfor:%d",
+		this->vp,
+		this->waitfor
+		);
+}
+
+bwrite:entry
+/execname == procname/
+{}
+
+g_vfs_strategy:entry
+/execname == procname/
+{
+	this->bo = args[0];
+	this->bp = args[1];
+
+	printf("bo:0x%p bp:0x%p",
+		this->bo,
+		this->bp
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("bp:bufobj:0x%p iocmd:%d iooffset:0x%p npages:%d",
+		this->bp->b_bufobj,
+		this->bp->b_iocmd,
+		this->bp->b_iooffset,
+		this->bp->b_npages
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->bp->b_pages;
+	printf("pages[0]:0x%p object:0x%p pindex:0x%x phys_addr:0x%p",
+		this->bp->b_pages[0],
+		this->bp->b_pages[0]->object,
+		this->bp->b_pages[0]->pindex,
+		this->bp->b_pages[0]->phys_addr
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	if (this->bp->b_pages[1]) {
+		printf("pages[1]:0x%p object:0x%p pindex:0x%x phys_addr:0x%p",
+			this->bp->b_pages[1],
+			this->bp->b_pages[1]->object,
+			this->bp->b_pages[1]->pindex,
+			this->bp->b_pages[1]->phys_addr
+		);
+	}
+
+	this->vmobj = this->bp->b_pages[0]->object;
+	printf("vmobj:size:0x%p ",
+		this->vmobj->size
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	/**************************memq****************************/
+	this->memq = this->vmobj->memq;
+	this->pg0 = this->memq.tqh_first;
+	printf("pg0:0x%p object:0x%p pindex:0x%x",
+		this->pg0,
+		this->pg0->object,
+		this->pg0->pindex
+		);
+}
+
 /*return*************************************************************************************/
+g_vfs_strategy:return
+/execname == procname/
+{}
+
+bwrite:return,
+ffs_update:return,
+ffs_load_inode:return,
+ffs_vgetf:return,
+ffs_valloc:return,
+ufs_makeinode:return,
+ufs_create:return
+/execname == procname/
+{}
+
 bufobj_wwait:return
 /execname == procname/
 {}
