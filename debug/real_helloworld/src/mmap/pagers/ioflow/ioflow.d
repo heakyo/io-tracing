@@ -13,10 +13,11 @@ BEGIN
 	rootvnodep = (struct vnode **)0xffffffff83df5740;
 
 	/*procname = "cat";*/
-	procname = "main";
-	/*procname = "rm";*/
+	/*procname = "main";*/
+	procname = "rm";
 	ufsopen = 0;
 	nameiflag = 0;
+	ffsgetcg_flag = 0;
 
 	/* @[stack()] = count() */
 	printf("-----IO Tracing Start-----");
@@ -68,6 +69,10 @@ sys_openat:entry
 	printf("pwd:pwd_rdir:%p", this->pwd->pwd_rdir);
 }
 
+isi_kern_unlinkat:entry
+/execname == procname/
+{}
+
 ufs_open:entry
 /execname == procname/
 {
@@ -103,13 +108,46 @@ ufs_lookup:entry
 {}
 
 breadn_flags:entry
-/execname == procname && nameiflag/
+/execname == procname && (nameiflag || ffsgetcg_flag)/
 {}
 
 getblkx:entry
-/execname == procname && nameiflag/
+/execname == procname && (nameiflag || ffsgetcg_flag)/
 {
+	self->gbxvp = args[0];
+	this->blkno = args[1];
+	this->size = args[2];
+	this->flags = args[5];
 	self->bpp = args[6];
+
+	printf("blkno:%d size:%d flags:0x%p",
+		this->blkno,
+		this->size,
+		this->flags
+		);
+        printf("\n\t\t\t\t\t      ");
+
+	printf("vp:%p type:%d tag:%s vmobj:0x%p",
+		self->gbxvp,
+		self->gbxvp->v_type,
+		stringof(self->gbxvp->v_tag),
+		self->gbxvp->v_bufobj.bo_object
+		);
+	func((uintptr_t)self->gbxvp->v_op);
+        printf("\n\t\t\t\t\t      ");
+
+	this->vmobj = self->gbxvp->v_bufobj.bo_object;
+	printf("vmobj:size:%d",
+		this->vmobj->size
+		);
+        printf("\n\t\t\t\t\t      ");
+
+	this->v_rdev = self->gbxvp->v_rdev;
+	if (this->v_rdev) {
+		printf("rdev:name:%s",
+			stringof(this->v_rdev->si_name)
+			);
+	}
 
 	printf("bp:*bpp:0x%p",
 		*self->bpp
@@ -254,9 +292,24 @@ ffs_valloc:entry
 /execname == procname/
 {}
 
+ffs_getcg:entry
+/execname == procname/
+{
+	printf("-----%s-----", probename);
+	ffsgetcg_flag = 1;
+}
+
 ffs_vgetf:entry
 /execname == procname/
-{}
+{
+	this->mp = args[0];
+	this->ump = (struct ufsmount *)this->mp->mnt_data;
+
+	this->devvp = this->ump->um_devvp;
+	printf("devvp:0x%p",
+		this->devvp
+		);
+}
 
 ffs_load_inode:entry
 /execname == procname/
@@ -270,8 +323,43 @@ ffs_load_inode:entry
 		);
 	printf("\n\t\t\t\t\t      ");
 
-	printf("bp:data:0x%p",
-		this->bp->b_data
+	printf("bp:blkno:%d iooffset:0x%p offset:0x%p bufsize:%d vp:0x%p qindex:%d",
+		this->bp->b_blkno,
+		this->bp->b_iooffset,
+		this->bp->b_offset,
+		this->bp->b_bufsize,
+		this->bp->b_vp,
+		this->bp->b_qindex
+		);
+	printf("\n\t\t\t\t\t      ");
+	printf("bp:data:0x%p bcount:%d kvabase:0x%p kvasize:%d",
+		this->bp->b_data,
+		this->bp->b_bcount,
+		this->bp->b_kvabase,
+		this->bp->b_kvasize
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->bufobj =  this->bp->b_bufobj;
+	printf("bufobf:ops:%p, bsize:%d",
+		this->bufobj->bo_ops,
+		this->bufobj->bo_bsize
+		);
+	printf("\n\t\t\t\t\t      ");
+	func((uintptr_t)this->bufobj->bo_ops);
+	printf("\n\t\t\t\t\t      ");
+
+	this->bufv_clean = this->bufobj->bo_clean;
+	printf("bufv_clean:cnt:%d",
+		this->bufv_clean.bv_cnt
+		);
+	printf("\n\t\t\t\t\t      ");
+	this->clean_bv_hd = this->bufv_clean.bv_hd;
+	printf("\n\t\t\t\t\t      ");
+
+	this->bufv_dirty = this->bufobj->bo_dirty;
+	printf("bufv_dirty:cnt:%d",
+		this->bufv_dirty.bv_cnt
 		);
 	printf("\n\t\t\t\t\t      ");
 
@@ -357,6 +445,13 @@ g_vfs_strategy:return
 /execname == procname/
 {}
 
+ffs_getcg:return
+/execname == procname/
+{
+	printf("-----%s-----", probename);
+	ffsgetcg_flag = 0;
+}
+
 bwrite:return,
 ffs_update:return,
 ffs_load_inode:return,
@@ -427,7 +522,7 @@ getnewbuf:return
 {}
 
 getblkx:return
-/execname == procname && nameiflag/
+/execname == procname && (nameiflag || ffsgetcg_flag)/
 {
 
 	this->bp = *self->bpp;
@@ -439,10 +534,17 @@ getblkx:return
 		this->bp,
 		this->bp->b_flags
 		);
+        printf("\n\t\t\t\t\t      ");
+
+	this->gtxbufobj = self->gbxvp->v_bufobj;
+	this->gtxvmobj = this->gtxbufobj.bo_object;
+	printf("vmobj:size:%d",
+		this->gtxvmobj->size
+		);
 }
 
 breadn_flags:return
-/execname == procname && nameiflag/
+/execname == procname && (nameiflag || ffsgetcg_flag)/
 {
 }
 
@@ -530,6 +632,10 @@ ufs_open:return
 
 	ufsopen = 0;
 }
+
+isi_kern_unlinkat:return
+/execname == procname/
+{}
 
 sys_openat:return
 /execname == procname/
