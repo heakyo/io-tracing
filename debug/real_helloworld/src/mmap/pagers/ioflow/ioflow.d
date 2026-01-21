@@ -148,6 +148,108 @@ getblkx:entry
 			stringof(this->v_rdev->si_name)
 			);
 	}
+        printf("\n\t\t\t\t\t      ");
+
+printf("***************VFS*************************");
+	printf("\n\t\t\t\t\t      ");
+
+	this->consumer = (struct g_consumer *)self->gbxvp->v_bufobj.bo_private;
+	this->geom = this->consumer->geom;
+	this->provider = this->consumer->provider;
+	printf("provider:%p geom:%p consumer:%p (lower)provider:%p",
+		this->geom->provider.lh_first,
+		this->geom,
+		this->consumer,
+		this->provider
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("consumer:%p geom:%p",
+		this->geom->consumer.lh_first,
+		this->geom->consumer.lh_first->geom
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("geom: name:%s cls_name:%s consumer:%p provider:%p",
+		stringof(this->geom->name),
+		stringof(this->geom->class->name),
+		this->geom->consumer.lh_first,
+		this->geom->provider.lh_first
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("provider:%p", this->geom->provider.lh_first);
+	printf("\n\t\t\t\t\t      ");
+
+printf("***************PART*************************");
+	printf("\n\t\t\t\t\t      ");
+
+	this->provider = this->consumer->provider;
+	this->geom = this->provider->geom;
+	this->consumer = this->geom->consumer.lh_first;
+	printf("provider:%p geom:%p consumer:%p (lower)provider:%p",
+		this->provider,
+		this->geom,
+		this->consumer,
+		this->geom->consumer.lh_first->provider /*dig*/
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("consumer:%p geom:%p",
+		this->consumer,
+		this->geom->consumer.lh_first->geom
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("geom: name:%s cls_name:%s consumer:%p provider:%p",
+		stringof(this->geom->name),
+		stringof(this->geom->class->name),
+		this->geom->consumer.lh_first,
+		this->geom->provider.lh_first
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("provider: name:%s cls_name:%s geom:%p",
+		stringof(this->provider->name),
+		stringof(this->geom->class->name),
+		this->provider->geom
+		);
+	printf("\n\t\t\t\t\t      ");
+	printf("privider consumers:%p",
+		this->provider->consumers.lh_first
+		);
+	printf("\n\t\t\t\t\t      ");
+
+printf("***************MD*************************");
+	printf("\n\t\t\t\t\t      ");
+
+	this->provider = this->consumer->provider;
+	this->geom = this->provider->geom;
+	this->consumer = this->geom->consumer.lh_first;
+	printf("provider:%p geom:%p consumer:%p",
+		this->provider,
+		this->geom,
+		this->consumer
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("provider:%p name:%s cls_name:%s consumer:%p provider:%p ",
+		this->provider,
+		stringof(this->provider->name),
+		stringof(this->geom->class->name),
+		this->geom->consumer.lh_first,
+		this->geom->provider.lh_first
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	printf("geom:%p name:%s cls_name:%s consumer:%p provider:%p",
+		this->geom,
+		stringof(this->geom->name),
+		stringof(this->geom->class->name),
+		this->geom->consumer.lh_first,
+		this->geom->provider.lh_first
+		);
+	printf("\n\t\t\t\t\t      ");
 
 	printf("bp:*bpp:0x%p",
 		*self->bpp
