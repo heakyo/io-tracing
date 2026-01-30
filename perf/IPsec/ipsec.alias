@@ -1,0 +1,1 @@
+alias mpstat-cpu0="mpstat -P 0 1 | awk '/^Linux/ {print; next} /^..:..:..[[:space:]]+CPU/ {if (hdr++) next; print; next} \$1 ~ /^[0-9]/ {print}'"
