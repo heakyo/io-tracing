@@ -542,7 +542,72 @@ g_vfs_strategy:entry
 		);
 }
 
+vnode_pager_setsize:entry
+/execname == procname/
+{}
+
+vm_object_page_remove:entry
+/execname == procname/
+{}
+
+vm_page_tryxbusy:entry
+/execname == procname/
+{}
+
+vm_page_xunbusy_hard_tail:entry
+/execname == procname/
+{}
+
+vinactive:entry
+/execname == procname/
+{
+	this->vp = args[0];
+
+	this->inode = (struct inode *)this->vp->v_data;
+	printf("inode: number:%d",
+		this->inode->i_number
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->vmobj = this->vp->v_bufobj.bo_object;
+	printf("vmobj:size:%d",
+		this->vmobj->size
+		);
+	printf("\n\t\t\t\t\t      ");
+
+	this->pg0 = this->vmobj->memq.tqh_first;
+	printf("pg0: pindex:%d busy_lock:0x%p",
+		this->pg0->pindex,
+		this->pg0->busy_lock
+		);
+	printf("\n\t\t\t\t\t      ");
+}
+
 /*return*************************************************************************************/
+vinactive:return
+/execname == procname/
+{}
+
+vm_page_xunbusy_hard_tail:return
+/execname == procname/
+{}
+
+vm_page_tryxbusy:return
+/execname == procname/
+{
+	this->ret = args[1];
+
+	printf("ret:%d", this->ret);
+}
+
+vm_object_page_remove:return
+/execname == procname/
+{}
+
+vnode_pager_setsize:return
+/execname == procname/
+{}
+
 g_vfs_strategy:return
 /execname == procname/
 {}

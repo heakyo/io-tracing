@@ -4,7 +4,7 @@
 #include <string.h>
 #include <assert.h>
 
-#define WRBUFSZ (32*1024)
+#define WRBUFSZ (8*1024)
 
 int main(int argc, char *argv[])
 {

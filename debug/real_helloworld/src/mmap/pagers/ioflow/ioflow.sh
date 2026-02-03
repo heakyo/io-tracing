@@ -16,4 +16,14 @@ ufs2demo_rm()
 	umount ufs2demo_mntdir
 }
 
-ufs2demo_rm
+ufs2demo_wr()
+{
+	mount /dev/md9p1 ufs2demo_mntdir
+	ls -l ufs2demo_mntdir
+	./wrioflow.d -c './main'
+	ls -l ufs2demo_mntdir
+	umount ufs2demo_mntdir
+}
+
+#ufs2demo_rm
+ufs2demo_wr
