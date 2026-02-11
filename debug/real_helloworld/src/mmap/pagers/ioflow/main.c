@@ -4,20 +4,26 @@
 #include <string.h>
 #include <assert.h>
 
-#define WRBUFSZ (8*1024)
+#define BUFSZ (8*1024)
 
 int main(int argc, char *argv[])
 {
 	int fd;
-	unsigned char wrbuf[WRBUFSZ];
+	unsigned char buf[BUFSZ];
 	int ret;
 
 	fd = open("ufs2demo_mntdir/myfirstfile", O_CREAT | O_RDWR | O_SYNC, 0777);
 	assert(fd != -1);
 
-	memset(wrbuf, 0xb5, sizeof(wrbuf));
-	ret = write(fd, wrbuf, sizeof(wrbuf));
+#if 0
+	memset(buf, 0xb5, sizeof(buf));
+	ret = write(fd, buf, sizeof(buf));
 	assert(ret != -1);
+#else
+	memset(buf, 0x0, sizeof(buf));
+	ret = read(fd, buf, sizeof(buf));
+	assert(ret != -1);
+#endif
 
 	//printf("ret:%d\n", ret);
 	close(fd);

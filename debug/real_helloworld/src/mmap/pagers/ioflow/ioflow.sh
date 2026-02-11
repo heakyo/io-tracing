@@ -25,5 +25,14 @@ ufs2demo_wr()
 	umount ufs2demo_mntdir
 }
 
+ufs2demo_rd()
+{
+	mount /dev/md9p1 ufs2demo_mntdir
+	./main
+	#./rdioflow.d -c './main'
+	umount ufs2demo_mntdir
+}
+
+ufs2demo_rd
+#ufs2demo_wr
 #ufs2demo_rm
-ufs2demo_wr
