@@ -1,6 +1,6 @@
 ################################################# How to use a file as a disk on FreeBSD ######################################################
 # 1. Check existing memory disks
-mdconfig -l
+mdconfig -lv
 
 # 2. Create a file to be used as a raw disk
 dd if=/dev/zero of=disk.img bs=1M count=100

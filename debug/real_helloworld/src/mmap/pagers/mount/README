@@ -8,7 +8,7 @@ truncate -s 100M ufs.img
 dd if=/dev/zero of=ufs.img bs=1M count=100
 
 # Check existing devices
-mdconfig -l
+mdconfig -lv
 ---------------------------------------
 md8 md0 md1 md2 md3 md4 md5 md6 md7
 
