@@ -21,79 +21,209 @@ BEGIN
         printf("rootvnode:%p", *rootvnodep);
 }
 
+/*Common*******************************************************************************/
+bstrategy:*
+/kwflag/
+{}
+
 /*Kernel Space*******************************************************************************/
-kern_writev:entry
+kern_pwritev:entry
 /execname == procname/
 {
 	trace(probename);
 	kwflag = 1;
 }
 
-vm_page_grab_pages_unlocked_tracked:entry
+ffs_write:entry
+/kwflag/
+{
+	this->ap = args[0];
+	this->vp = this->ap->a_vp;
+
+	printf("vp:%p",
+		this->vp
+	);
+        printf("\n\t\t\t\t\t      ");
+}
+
+ffs_balloc_ufs2:entry
+/kwflag/
+{
+	this->vp = args[0];
+	this->bpp = args[5];
+
+	printf("vp:%p", this->vp);
+}
+
+vn_io_fault_pgmove:entry
 /kwflag/
 {}
 
-vm_page_insert_radixdone:entry
+bwrite:entry
 /kwflag/
 {
-	this->m = args[0];
+	printf("-----------------------------------------------------");
+}
 
-	printf("pg:busy_lock:%d",
-		this->m->busy_lock
-		);
+ffs_bufwrite:entry
+/kwflag/
+{}
+
+bufwrite:entry
+/kwflag/
+{
+	this->bp = args[0];
+	this->vp = this->bp->b_vp;
+
+	/***** vnode *****/
+	printf("vp:%p tag:%s type:%d mnt_data:%p op:",
+		this->vp,
+		stringof(this->vp->v_tag),
+		this->vp->v_type,
+		this->vp->v_mount->mnt_data
+	);
+	func((uintptr_t)this->vp->v_op);
+        printf("\n\t\t\t\t\t      ");
+
+	/***** inode *****/
+	this->inode = (struct inode *)this->vp->v_data;
+	printf("inode:%p flag:%p number:%p size:%d ump:%p",
+		this->inode,
+		this->inode->i_flag,
+		this->inode->i_number,
+		this->inode->i_size,
+		this->inode->i_ump
+	);
+        printf("\n\t\t\t\t\t      ");
+
+	/***** buf *****/
+	printf("bp:%p",
+		this->bp
+	);
+        printf("\n\t\t\t\t\t      ");
+
+	/***** bufobj *****/
+	this->bufobj = this->bp->b_bufobj;
+	printf("bufobj:%p private:%p bop_name:%s ops:",
+		this->bufobj,
+		this->bufobj->bo_private,
+		stringof(this->bufobj->bo_ops->bop_name)
+	);
+	func((uintptr_t)this->bufobj->bo_ops);
+        printf("\n\t\t\t\t\t      ");
+	/*func((uintptr_t)this->bufobj->bo_ops->bop_write);*/
 
 	/*stack();*/
 }
 
-vm_page_sunbusy:entry
+bufstrategy:entry
+/kwflag/
+{}
+
+ufs_strategy:entry
+/kwflag/
+{}
+
+ffs_update:entry
 /kwflag/
 {
-	self->m = args[0];
+	this->vp = args[0];
 
-	printf("pg:busy_lock:%d",
-		self->m->busy_lock
-		);
-
-	/*stack();*/
+	/***** vnode *****/
+	printf("vp:%p tag:%s",
+		this->vp,
+		stringof(this->vp->v_tag)
+	);
+        printf("\n\t\t\t\t\t      ");
 }
 
-vm_page_trysbusy:entry
+ffs_geom_strategy:entry
 /kwflag/
 {
-	self->m = args[0];
-
-	printf("pg:busy_lock:%d",
-		self->m->busy_lock
-		);
+	this->bufobj = args[0];
+	printf("bufobj:%p private:%p bop_name:%s ops:",
+		this->bufobj,
+		this->bufobj->bo_private,
+		stringof(this->bufobj->bo_ops->bop_name)
+	);
+	func((uintptr_t)this->bufobj->bo_ops);
+        printf("\n\t\t\t\t\t      ");
 }
+
+adastrategy:entry
+/0&&kwflag/
+{}
+
+bdone:entry
+/0&&kwflag/
+{}
 
 /*return*************************************************************************************/
-vm_page_trysbusy:return
-/kwflag/
-{
-	printf("pg:busy_lock:%d",
-		self->m->busy_lock
-		);
-}
+bdone:return
+/0&&kwflag/
+{}
 
-vm_page_sunbusy:return
-/kwflag/
-{
-	printf("pg:busy_lock:%d",
-		self->m->busy_lock
-		);
-	/*stack();*/
-}
+adastrategy:return
+/0&&kwflag/
+{}
 
-vm_page_insert_radixdone:return
+ffs_geom_strategy:return
 /kwflag/
 {}
 
-vm_page_grab_pages_unlocked_tracked:return
+ffs_update:return
+/kwflag/
+{
+}
+
+ufs_strategy:return
 /kwflag/
 {}
 
-kern_writev:return
+bufstrategy:return
+/kwflag/
+{}
+
+bufwrite:return
+/kwflag/
+{}
+
+ffs_bufwrite:return
+/kwflag/
+{}
+
+bwrite:return
+/kwflag/
+{}
+
+vn_io_fault_pgmove:return
+/kwflag/
+{}
+
+ffs_balloc_ufs2:return
+/kwflag/
+{
+	this->bp = *this->bpp;
+	printf("bp:%p", this->bp);
+        printf("\n\t\t\t\t\t      ");
+
+	/***** bufobj *****/
+	this->bufobj = this->bp->b_bufobj;
+	printf("bufobj:%p private:%p bop_name:%s ops:",
+		this->bufobj,
+		this->bufobj->bo_private,
+		stringof(this->bufobj->bo_ops->bop_name)
+	);
+	func((uintptr_t)this->bufobj->bo_ops);
+        printf("\n\t\t\t\t\t      ");
+	func((uintptr_t)this->bufobj->bo_ops->bop_write);
+}
+
+ffs_write:return
+/kwflag/
+{}
+
+kern_pwritev:return
 /execname == procname/
 {
 	trace(probename);

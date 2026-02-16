@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-#define BUFSZ (8*1024)
+#define BUFSZ (16*1024)
 
 bool run_pread, run_sysmap;
 
@@ -31,8 +31,8 @@ read_file(void)
 		exit(-1);
 	}
 
-	//ret = pwrite(fd, buf, sizeof(buf), 0);
-	ret = 0;
+	ret = pwrite(fd, buf, sizeof(buf), 0);
+	//ret = 0;
 	assert(ret != -1);
 
 	if (run_sysmap) {
