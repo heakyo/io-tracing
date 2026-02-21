@@ -12,6 +12,7 @@
 #define BUFSZ (16*1024)
 
 bool run_pread, run_sysmap;
+int fflag;
 
 static int
 read_file(void)
@@ -25,7 +26,10 @@ read_file(void)
 
 	memset(buf, 0x0C, sizeof(buf));
 
-	fd = open("ufs2demo_mntdir/myfirstfile", O_CREAT | O_RDWR | O_SYNC, 0777);
+	if (fflag) // sync write
+		fd = open("ufs2demo_mntdir/myfirstfile", O_CREAT | O_RDWR | fflag, 0777);
+	else // delayed write
+		fd = open("ufs2demo_mntdir/myfirstfile", O_CREAT | O_RDWR, 0777);
 	if (fd == -1) {
 		perror("Failed to open file");
 		exit(-1);
@@ -76,8 +80,9 @@ void
 usage(void)
 {
 	printf("usage:\t./main [-r] [-s] [-h]\n\t");
-	printf("-r: Use pread syscall\n\t");
-	printf("-s: Use sysmap syscall\n\t");
+	printf("-p: Use pread syscall\n\t");
+	printf("-m: Use sysmap syscall\n\t");
+	printf("-s: Open file with sync flag\n\t");
 	printf("-h: Show help info\n");
 
 	exit(-1);
@@ -89,18 +94,22 @@ main(int argc, char *argv[])
         int ch;
 	run_pread = false;
 	run_sysmap = false;
+	fflag = 0;
 
 	if (argc == 1)
 		usage();
 
-        while ((ch = getopt(argc, argv, "rsh")) != -1) {
+        while ((ch = getopt(argc, argv, "pmsh")) != -1) {
                 switch (ch) {
-                case 'r':
+                case 'p':
                         run_pread = true;
                         break;
-                case 's':
+                case 'm':
                         run_sysmap = true;
                         break;
+		case 's':
+			fflag = O_SYNC;
+			break;
 		case 'h':
 			usage();
 			break;

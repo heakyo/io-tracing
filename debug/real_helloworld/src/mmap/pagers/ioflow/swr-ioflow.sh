@@ -16,13 +16,13 @@ tunefs_ufs()
 }
 
 # Device: /dev/ada0p20
-ufs2demo_wr()
+ufs2demo_wr_sync()
 {
 	echo "mount $1 $MNT"
 	mount $1 $MNT
 	#ls $MNT
 
-	./wr-ioflow.d -c './main -r'
+	./swr-ioflow.d -c './main -p -s'
 	#ls $FILE
 
 	rm -rf $FILE
@@ -39,4 +39,4 @@ if [ -n "$MP" ]; then
     umount "$DEV"
 fi
 
-ufs2demo_wr $DEV
+ufs2demo_wr_sync $DEV
