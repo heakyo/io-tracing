@@ -1,0 +1,8 @@
+# start the docker
+docker-compose up -d
+
+# verify the result
+curl -I 127.1:8080
+
+# stop the docker
+docker-compose down

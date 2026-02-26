@@ -1,0 +1,7 @@
+services:
+  web-server:
+    image: nginx:latest
+    container_name: my-nginx-test
+    ports:
+      - "8080:80"
+    restart: always
