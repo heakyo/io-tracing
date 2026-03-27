@@ -12,13 +12,14 @@
 3. [Prerequisites](#3-prerequisites)
 4. [Quick Start: Launch Jenkins](#4-quick-start-launch-jenkins)
 5. [Access Jenkins from Another Machine](#5-access-jenkins-from-another-machine)
-6. [The Build Job: Build_HelloWorld_Simple](#6-the-build-job-build_helloworld_simple)
+6. [The Build Job: Build_HelloWorld_Simple (Build with Parameters)](#6-the-build-job-build_helloworld_simple-build-with-parameters)
 7. [Trigger a Build](#7-trigger-a-build)
 8. [View Build Results](#8-view-build-results)
-9. [Common Operations](#9-common-operations)
-10. [File Structure](#10-file-structure)
-11. [Troubleshooting](#11-troubleshooting)
-12. [Glossary](#12-glossary)
+9. [Find Build Artifacts](#9-find-build-artifacts)
+10. [Common Operations](#10-common-operations)
+11. [File Structure](#11-file-structure)
+12. [Troubleshooting](#12-troubleshooting)
+13. [Glossary](#13-glossary)
 
 ---
 
@@ -175,33 +176,68 @@ Test-NetConnection localhost -Port 8080
 
 ---
 
-## 6. The Build Job: Build_HelloWorld_Simple
+## 6. The Build Job: Build_HelloWorld_Simple (Build with Parameters)
 
-The job runs a shell script that performs 3 stages:
+This job supports **Build with Parameters** — you specify a Git repository name, and Jenkins automatically clones it from your Git server and compiles it. This is similar to how `Build_OneFS_Simple` works on the production Jenkins.
+
+### Build Parameters
+
+| Parameter | Default Value | Description |
+|---|---|---|
+| **REPO_NAME** | `hello_world` | Repository name under your Git account (e.g. `hello_world`, `my_project`) |
+| **BRANCH** | `main` | Branch to build |
+| **GIT_BASE_URL** | `https://eos2git.cec.lab.emc.com/mam28` | Git server base URL |
+
+### The Analogy
+
+Think of it like ordering at a restaurant: you don't need to go into the kitchen yourself. You just fill in the order form (parameters) — which dish (repo), which style (branch) — and the chef (Jenkins) handles everything else.
+
+### Build Stages
+
+The job runs 4 stages automatically:
 
 ```
- Stage 1: PREPARE          Stage 2: BUILD           Stage 3: TEST
- ──────────────>           ──────────────>          ──────────────>
- Print gcc and             make clean               Run ./main
- make versions             make all                 Verify output
-                           (compile main.c)
+ Stage 1: ENVIRONMENT     Stage 2: CLONE           Stage 3: BUILD          Stage 4: TEST
+ ──────────────>          ──────────────>          ──────────────>         ──────────────>
+ Print gcc/make/git       git clone from           make clean              Run ./main
+ versions                 eos2git server           make all                Verify output
 ```
 
 ### What Happens Internally
 
 ```bash
-# Stage 1 - Prepare
+# Stage 1 - Environment
 gcc --version
 make --version
+git --version
 
-# Stage 2 - Build
-cd /var/jenkins_home/project/src
-make clean        # Remove old artifacts
+# Stage 2 - Clone Repository
+git clone --branch ${BRANCH} --single-branch \
+    ${GIT_BASE_URL}/${REPO_NAME}.git ${WORKSPACE}/repo
+
+# Stage 3 - Build
+cd ${WORKSPACE}/repo
+make clean
 make all          # Compile: main.c → main.o → main
 
-# Stage 3 - Test
+# Stage 4 - Test
 ./main            # Output: "Hello, World!"
 ```
+
+### Git Authentication
+
+The Jenkins container uses a `.netrc` file for Git credentials. To configure (first time or after container recreate):
+
+```bash
+docker exec jenkins-hello bash -c "cat > /root/.netrc << 'EOF'
+machine eos2git.cec.lab.emc.com
+login <YOUR_USERNAME>
+password <YOUR_PERSONAL_ACCESS_TOKEN>
+EOF
+chmod 600 /root/.netrc"
+```
+
+> **Note**: Generate a classic Personal Access Token at `https://eos2git.cec.lab.emc.com/settings/tokens/new` with **repo** scope.
 
 ### Creating the Job (first time only)
 
@@ -225,11 +261,16 @@ curl -s -X POST "http://localhost:8080/createItem?name=Build_HelloWorld_Simple" 
 
 ## 7. Trigger a Build
 
-### From the Web UI
+### From the Web UI (Build with Parameters)
 
 1. Open **http://localhost:8080**
 2. Click **Build_HelloWorld_Simple**
-3. Click **Build Now** (left sidebar)
+3. Click **Build with Parameters** (left sidebar)
+4. Fill in the parameters:
+   - **REPO_NAME**: e.g. `hello_world`
+   - **BRANCH**: e.g. `main`
+   - **GIT_BASE_URL**: default is fine for `mam28`'s repos
+5. Click **Build**
 
 ### From the Command Line
 
@@ -239,10 +280,13 @@ COOKIE_JAR=/tmp/jenkins-cookies.txt
 CRUMB_JSON=$(curl -s -c "$COOKIE_JAR" 'http://localhost:8080/crumbIssuer/api/json')
 CRUMB_VALUE=$(echo "$CRUMB_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['crumb'])")
 
-# Trigger build
-curl -s -X POST "http://localhost:8080/job/Build_HelloWorld_Simple/build?delay=0sec" \
+# Trigger parameterized build
+curl -s -X POST "http://localhost:8080/job/Build_HelloWorld_Simple/buildWithParameters" \
   -b "$COOKIE_JAR" \
-  -H "Jenkins-Crumb: $CRUMB_VALUE"
+  -H "Jenkins-Crumb: $CRUMB_VALUE" \
+  --data-urlencode "REPO_NAME=hello_world" \
+  --data-urlencode "BRANCH=main" \
+  --data-urlencode "GIT_BASE_URL=https://eos2git.cec.lab.emc.com/mam28"
 ```
 
 ---
@@ -273,31 +317,93 @@ Started by user unknown or anonymous
 Running as SYSTEM
 Building in workspace /var/jenkins_home/workspace/Build_HelloWorld_Simple
 [Build_HelloWorld_Simple] $ /bin/sh -xe /tmp/jenkins*.sh
-+ echo === Build Environment ===
-=== Build Environment ===
-+ gcc --version
++ set -e
+============================================
+  Build_HelloWorld_Simple (Parameterized)
+============================================
+  REPO_NAME : hello_world
+  BRANCH    : main
+  GIT_URL   : https://eos2git.cec.lab.emc.com/mam28/hello_world.git
+============================================
+
+=== Stage 1: Environment ===
 gcc (GCC) 15.2.0
-...
-+ echo === Building Hello World ===
-=== Building Hello World ===
-+ cd /var/jenkins_home/project/src
-+ make clean
-rm -rf main *.o
-+ make all
+GNU Make 4.4.1
+git version 2.47.3
+
+=== Stage 2: Clone Repository ===
+Cloning into '/var/jenkins_home/workspace/Build_HelloWorld_Simple/repo'...
+
+=== Stage 3: Build ===
 cc -O0 -g -c -o main.o main.c
 cc -O0 -g -o main main.o
-+ echo === Running Hello World ===
-=== Running Hello World ===
-+ ./main
+
+=== Stage 4: Test ===
 Hello, World!
-+ echo === Build SUCCESS ===
-=== Build SUCCESS ===
+
+============================================
+  BUILD SUCCESS
+============================================
 Finished: SUCCESS
 ```
 
 ---
 
-## 9. Common Operations
+## 9. Find Build Artifacts
+
+After a successful build, the compiled files are stored **inside the Jenkins container**. Think of it like a warehouse — the finished products are stored in a specific shelf (directory), and you need to know the shelf number to find them.
+
+### Artifact Location
+
+```
+Container path:
+/var/jenkins_home/workspace/Build_HelloWorld_Simple/repo/
+├── main      ← Executable binary
+├── main.o    ← Object file
+├── main.c    ← Source code (cloned)
+└── Makefile  ← Build rules (cloned)
+```
+
+### Retrieve Artifacts
+
+#### Option A: docker cp (simplest)
+
+Copy the compiled binary to your host machine:
+```bash
+# Copy the executable
+docker cp jenkins-hello:/var/jenkins_home/workspace/Build_HelloWorld_Simple/repo/main ./main
+
+# Copy all build artifacts
+docker cp jenkins-hello:/var/jenkins_home/workspace/Build_HelloWorld_Simple/repo/ ./build-output/
+```
+
+#### Option B: Enter the container
+
+```bash
+docker exec -it jenkins-hello bash
+cd /var/jenkins_home/workspace/Build_HelloWorld_Simple/repo/
+ls -la
+```
+
+#### Option C: View via Jenkins API
+
+```bash
+# List workspace files
+curl -s http://localhost:8080/job/Build_HelloWorld_Simple/ws/repo/
+
+# Download a specific file
+curl -s -O http://localhost:8080/job/Build_HelloWorld_Simple/ws/repo/main
+```
+
+### Artifact Lifecycle
+
+- Artifacts are **overwritten** on each new build (the workspace is cleaned before clone)
+- Artifacts persist as long as the Jenkins container and its volume exist
+- Running `docker-compose down -v` **deletes all artifacts** along with the volume
+
+---
+
+## 10. Common Operations
 
 | Task | Command |
 |---|---|
@@ -312,7 +418,7 @@ Finished: SUCCESS
 
 ---
 
-## 10. File Structure
+## 11. File Structure
 
 ```
 MyBuildWeb/
@@ -344,7 +450,7 @@ The Dockerfile uses a multi-stage approach to get GCC into the Jenkins image:
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 ### Jenkins won't start
 ```bash
@@ -382,7 +488,7 @@ docker-compose up -d      # Recreates everything
 
 ---
 
-## 12. Glossary
+## 13. Glossary
 
 | Term | Definition |
 |---|---|
@@ -398,6 +504,10 @@ docker-compose up -d      # Recreates everything
 | **SSH Tunnel** | An encrypted connection that forwards network ports through SSH |
 | **Volume** | A Docker mechanism for persisting data outside the container lifecycle |
 | **LTS** | Long Term Support — a stable, well-tested release of Jenkins |
+| **Build with Parameters** | A Jenkins feature that lets you pass input values (like repo name, branch) when triggering a build |
+| **PAT** | Personal Access Token — a password substitute for authenticating to Git servers via HTTPS |
+| **.netrc** | A file that stores machine credentials for automatic login by tools like `git` and `curl` |
+| **Workspace** | The directory inside Jenkins where a job's files are checked out and built |
 
 ---
 
