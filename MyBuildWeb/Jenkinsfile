@@ -1,0 +1,42 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Prepare') {
+            steps {
+                echo "=== Build Environment ==="
+                sh 'gcc --version || true'
+                sh 'make --version || true'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir('src') {
+                    sh 'make clean || true'
+                    sh 'make all'
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                dir('src') {
+                    sh './main'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "=== Build Finished ==="
+        }
+        success {
+            echo "Build SUCCESS"
+        }
+        failure {
+            echo "Build FAILED"
+        }
+    }
+}
