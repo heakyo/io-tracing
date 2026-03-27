@@ -424,36 +424,41 @@ If Jenkins is the chef who cooks your food, MyBuildWeb is the **restaurant displ
 ### How It Works
 
 ```
- Jenkins (inside Docker)              MyBuildWeb (on host)
+ Jenkins container (jenkins-hello)    BuildWeb container (mybuildweb)
  ┌──────────────────────┐            ┌──────────────────────────────┐
  │ Build completes →    │            │                              │
- │ Saves to volume:     │            │  Reads from Docker volume:   │
- │  buildweb_data/      │───────────→│  /var/lib/docker/volumes/    │
- │   hello_world_001/   │            │   mybuildweb_jenkins_home/   │
- │    build_meta.json   │            │    _data/buildweb_data/      │
- │    artifacts/        │            │                              │
- │     main             │            │  Serves on port 9090:        │
- │     main.o           │            │  - Web UI (build history)    │
- │     *.tar.gz         │            │  - JSON API                  │
- └──────────────────────┘            │  - File downloads            │
-                                     └──────────────────────────────┘
+ │ Saves to volume:     │            │  Reads from shared volume:   │
+ │  buildweb_data/      │───────────→│  /var/jenkins_home/          │
+ │   hello_world_001/   │  (shared)  │    buildweb_data/            │
+ │    build_meta.json   │  jenkins   │                              │
+ │    artifacts/        │  _home     │  Serves on port 9090:        │
+ │     main             │  volume    │  - Web UI (build history)    │
+ │     main.o           │            │  - JSON API                  │
+ │     *.tar.gz         │            │  - File downloads            │
+ └──────────────────────┘            └──────────────────────────────┘
 ```
 
 ### Start the BuildWeb Server
 
+BuildWeb runs as a Docker container alongside Jenkins. Both are managed by `docker-compose`:
+
 ```bash
-# Set the builds directory to the Jenkins Docker volume
-export BUILDS_DIR="/var/lib/docker/volumes/mybuildweb_jenkins_home/_data/buildweb_data"
-export BUILDWEB_PORT=9090
-
-# Start in the background
 cd /path/to/io-tracing/MyBuildWeb
-nohup python3 buildweb/server.py > /tmp/buildweb.log 2>&1 &
 
-# Verify it's running
+# Start both Jenkins and BuildWeb
+docker-compose up -d
+
+# Verify BuildWeb is running
 curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/
 # Expected: 200
+
+# Check container status
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "jenkins|buildweb"
+# jenkins-hello   Up 10 minutes
+# mybuildweb      Up 10 minutes
 ```
+
+> **Note**: BuildWeb mounts the `jenkins_home` volume as read-only. It automatically picks up new builds as Jenkins completes them — no restart needed.
 
 ### Access the Web UI
 
@@ -573,14 +578,20 @@ buildweb_data/
 | `BUILDS_DIR` | `/var/jenkins_home/buildweb_data` | Path to the builds data directory |
 | `BUILDWEB_PORT` | `8081` | Port to listen on (we override to `9090`) |
 
-### Stop the BuildWeb Server
+### Stop / Restart the BuildWeb Server
 
 ```bash
-# Find the process
-ps aux | grep 'buildweb/server.py' | grep -v grep
+# Stop BuildWeb only (Jenkins keeps running)
+docker-compose stop buildweb
 
-# Kill it
-kill $(ps aux | grep 'buildweb/server.py' | grep -v grep | awk '{print $2}')
+# Restart BuildWeb only
+docker-compose restart buildweb
+
+# Stop everything (Jenkins + BuildWeb)
+docker-compose down
+
+# View BuildWeb container logs
+docker logs mybuildweb
 ```
 
 ---
@@ -589,16 +600,18 @@ kill $(ps aux | grep 'buildweb/server.py' | grep -v grep | awk '{print $2}')
 
 | Task | Command |
 |---|---|
-| Start Jenkins | `docker-compose up -d` |
-| Stop Jenkins | `docker-compose down` |
+| Start all (Jenkins + BuildWeb) | `docker-compose up -d` |
+| Stop all (Jenkins + BuildWeb) | `docker-compose down` |
 | Restart Jenkins | `docker-compose restart` |
 | View container logs | `docker logs jenkins-hello` |
-| Rebuild image (after Dockerfile change) | `docker-compose build && docker-compose up -d` |
+| Rebuild images (after Dockerfile change) | `docker-compose build && docker-compose up -d` |
 | Enter container shell | `docker exec -it jenkins-hello bash` |
 | Test GCC inside container | `docker exec jenkins-hello gcc --version` |
 | Delete all data (fresh start) | `docker-compose down -v` |
-| Start BuildWeb server | `BUILDS_DIR=/var/lib/docker/volumes/mybuildweb_jenkins_home/_data/buildweb_data BUILDWEB_PORT=9090 nohup python3 buildweb/server.py &` |
-| Stop BuildWeb server | `kill $(ps aux \| grep server.py \| grep -v grep \| awk '{print $2}')` |
+| Start BuildWeb | `docker-compose up -d buildweb` |
+| Stop BuildWeb | `docker-compose stop buildweb` |
+| Restart BuildWeb | `docker-compose restart buildweb` |
+| View BuildWeb logs | `docker logs mybuildweb` |
 | Open BuildWeb | `http://localhost:9090` |
 
 ---
@@ -607,10 +620,11 @@ kill $(ps aux | grep 'buildweb/server.py' | grep -v grep | awk '{print $2}')
 
 ```
 MyBuildWeb/
-├── Dockerfile              ← Custom Jenkins + GCC image definition
-├── docker-compose.yml      ← Docker Compose service configuration
+├── Dockerfile              ← Jenkins + GCC image definition
+├── docker-compose.yml      ← Docker Compose: Jenkins + BuildWeb services
 ├── Jenkinsfile             ← Pipeline definition (for SCM-based jobs)
 ├── buildweb/
+│   ├── Dockerfile          ← BuildWeb image definition (python:3-slim)
 │   └── server.py           ← MyBuildWeb dashboard server (Python, port 9090)
 ├── src/
 │   ├── main.c              ← Hello World C source code

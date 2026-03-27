@@ -424,36 +424,41 @@ MyBuildWeb 是一个轻量级 HTTP 服务器（灵感来自 Isilon 的 `build.we
 ### 工作原理
 
 ```
- Jenkins（Docker 容器内）             MyBuildWeb（宿主机上）
+ Jenkins 容器 (jenkins-hello)         BuildWeb 容器 (mybuildweb)
  ┌──────────────────────┐            ┌──────────────────────────────┐
  │ 构建完成 →           │            │                              │
- │ 保存到卷：           │            │  从 Docker 卷读取：          │
- │  buildweb_data/      │───────────→│  /var/lib/docker/volumes/    │
- │   hello_world_001/   │            │   mybuildweb_jenkins_home/   │
- │    build_meta.json   │            │    _data/buildweb_data/      │
- │    artifacts/        │            │                              │
- │     main             │            │  在端口 9090 提供服务：      │
- │     main.o           │            │  - 网页界面（构建历史）      │
- │     *.tar.gz         │            │  - JSON API                  │
- └──────────────────────┘            │  - 文件下载                  │
-                                     └──────────────────────────────┘
+ │ 保存到卷：           │            │  从共享卷读取：              │
+ │  buildweb_data/      │───────────→│  /var/jenkins_home/          │
+ │   hello_world_001/   │  (共享的)  │    buildweb_data/            │
+ │    build_meta.json   │  jenkins   │                              │
+ │    artifacts/        │  _home     │  在端口 9090 提供服务：      │
+ │     main             │  卷        │  - 网页界面（构建历史）      │
+ │     main.o           │            │  - JSON API                  │
+ │     *.tar.gz         │            │  - 文件下载                  │
+ └──────────────────────┘            └──────────────────────────────┘
 ```
 
 ### 启动 BuildWeb 服务器
 
+BuildWeb 作为 Docker 容器与 Jenkins 一起运行，由 `docker-compose` 统一管理：
+
 ```bash
-# 设置构建目录为 Jenkins Docker 卷路径
-export BUILDS_DIR="/var/lib/docker/volumes/mybuildweb_jenkins_home/_data/buildweb_data"
-export BUILDWEB_PORT=9090
-
-# 后台启动
 cd /path/to/io-tracing/MyBuildWeb
-nohup python3 buildweb/server.py > /tmp/buildweb.log 2>&1 &
 
-# 验证是否运行
+# 同时启动 Jenkins 和 BuildWeb
+docker-compose up -d
+
+# 验证 BuildWeb 是否运行
 curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/
 # 期望输出：200
+
+# 查看容器状态
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "jenkins|buildweb"
+# jenkins-hello   Up 10 minutes
+# mybuildweb      Up 10 minutes
 ```
+
+> **注意**：BuildWeb 以只读方式挂载 `jenkins_home` 卷。Jenkins 每次构建完成后，BuildWeb 会自动读取到新数据 — 无需重启。
 
 ### 访问 Web 界面
 
@@ -573,14 +578,20 @@ buildweb_data/
 | `BUILDS_DIR` | `/var/jenkins_home/buildweb_data` | 构建数据目录路径 |
 | `BUILDWEB_PORT` | `8081` | 监听端口（我们覆盖为 `9090`） |
 
-### 停止 BuildWeb 服务器
+### 停止 / 重启 BuildWeb 服务器
 
 ```bash
-# 查找进程
-ps aux | grep 'buildweb/server.py' | grep -v grep
+# 仅停止 BuildWeb（Jenkins 继续运行）
+docker-compose stop buildweb
 
-# 终止进程
-kill $(ps aux | grep 'buildweb/server.py' | grep -v grep | awk '{print $2}')
+# 仅重启 BuildWeb
+docker-compose restart buildweb
+
+# 停止所有服务（Jenkins + BuildWeb）
+docker-compose down
+
+# 查看 BuildWeb 容器日志
+docker logs mybuildweb
 ```
 
 ---
@@ -589,16 +600,18 @@ kill $(ps aux | grep 'buildweb/server.py' | grep -v grep | awk '{print $2}')
 
 | 操作 | 命令 |
 |---|---|
-| 启动 Jenkins | `docker-compose up -d` |
-| 停止 Jenkins | `docker-compose down` |
+| 启动所有服务（Jenkins + BuildWeb） | `docker-compose up -d` |
+| 停止所有服务（Jenkins + BuildWeb） | `docker-compose down` |
 | 重启 Jenkins | `docker-compose restart` |
 | 查看容器日志 | `docker logs jenkins-hello` |
 | 重新构建镜像（修改 Dockerfile 后） | `docker-compose build && docker-compose up -d` |
 | 进入容器终端 | `docker exec -it jenkins-hello bash` |
 | 在容器内测试 GCC | `docker exec jenkins-hello gcc --version` |
 | 删除所有数据（全新开始） | `docker-compose down -v` |
-| 启动 BuildWeb 服务器 | `BUILDS_DIR=/var/lib/docker/volumes/mybuildweb_jenkins_home/_data/buildweb_data BUILDWEB_PORT=9090 nohup python3 buildweb/server.py &` |
-| 停止 BuildWeb 服务器 | `kill $(ps aux \| grep server.py \| grep -v grep \| awk '{print $2}')` |
+| 启动 BuildWeb | `docker-compose up -d buildweb` |
+| 停止 BuildWeb | `docker-compose stop buildweb` |
+| 重启 BuildWeb | `docker-compose restart buildweb` |
+| 查看 BuildWeb 日志 | `docker logs mybuildweb` |
 | 打开 BuildWeb | `http://localhost:9090` |
 
 ---
@@ -607,10 +620,11 @@ kill $(ps aux | grep 'buildweb/server.py' | grep -v grep | awk '{print $2}')
 
 ```
 MyBuildWeb/
-├── Dockerfile              ← 自定义 Jenkins + GCC 镜像定义
-├── docker-compose.yml      ← Docker Compose 服务配置
+├── Dockerfile              ← Jenkins + GCC 镜像定义
+├── docker-compose.yml      ← Docker Compose：Jenkins + BuildWeb 双服务配置
 ├── Jenkinsfile             ← 流水线定义（用于 SCM 类型的任务）
 ├── buildweb/
+│   ├── Dockerfile          ← BuildWeb 镜像定义（python:3-slim）
 │   └── server.py           ← MyBuildWeb 仪表盘服务器（Python，端口 9090）
 ├── src/
 │   ├── main.c              ← Hello World C 源代码

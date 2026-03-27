@@ -13,5 +13,18 @@ services:
       - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
     restart: unless-stopped
 
+  buildweb:
+    build: ./buildweb
+    container_name: mybuildweb
+    network_mode: host
+    volumes:
+      - jenkins_home:/var/jenkins_home:ro
+    environment:
+      - BUILDS_DIR=/var/jenkins_home/buildweb_data
+      - BUILDWEB_PORT=9090
+    depends_on:
+      - jenkins
+    restart: unless-stopped
+
 volumes:
   jenkins_home:
