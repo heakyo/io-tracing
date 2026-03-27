@@ -1,3 +1,6 @@
 [submodule "MyBuildWeb/jenkins-pipelines"]
 	path = MyBuildWeb/jenkins-pipelines
 	url = git@eos2git.cec.lab.emc.com:powerscale/jenkins-pipelines.git
+[submodule "MyBuildWeb/.cognition/skills/vendor/superpowers"]
+	path = MyBuildWeb/.cognition/skills/vendor/superpowers
+	url = https://github.com/obra/superpowers
