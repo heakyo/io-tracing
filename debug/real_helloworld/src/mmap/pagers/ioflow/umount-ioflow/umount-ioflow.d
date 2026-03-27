@@ -18,7 +18,14 @@ BEGIN
 /*Kernel Space*******************************************************************************/
 sys_unmount:entry
 /execname == procname/
-{}
+{
+	this->uap = args[1];
+
+	printf("uap:flags:%p path:%s",
+		this->uap->flags,
+		copyinstr((uintptr_t)this->uap->path)
+	);
+}
 
 /*return*************************************************************************************/
 sys_unmount:return

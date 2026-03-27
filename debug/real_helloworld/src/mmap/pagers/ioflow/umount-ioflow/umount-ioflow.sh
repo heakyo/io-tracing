@@ -15,11 +15,19 @@ tunefs_ufs()
 	tunefs -p $1 2>&1 | grep "soft updates"
 }
 
+show_fsid()
+{
+	dumpfs $1 | grep -w id | sed 's/.*\(id.*\]\).*/\1/'
+}
+
 # Device: /dev/ada0p20
 ufs2demo_umount()
 {
 	echo "mount $1 $MNT"
 	mount $1 $MNT
+
+	echo "show FSID"
+	show_fsid $MNT
 
 	echo "umount $MNT"
 	./umount-ioflow.d -c "umount $1"
