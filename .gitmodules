@@ -1,0 +1,3 @@
+[submodule "MyBuildWeb/jenkins-pipelines"]
+	path = MyBuildWeb/jenkins-pipelines
+	url = git@eos2git.cec.lab.emc.com:powerscale/jenkins-pipelines.git
