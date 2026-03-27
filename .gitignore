@@ -9,3 +9,4 @@
 *.log
 main
 __pycache__
+__pycache__/
