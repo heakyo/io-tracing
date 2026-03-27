@@ -11,7 +11,8 @@
 2. [整体架构](#2-整体架构)
 3. [前置条件](#3-前置条件)
 4. [快速开始：启动 Jenkins](#4-快速开始启动-jenkins)
-5. [从另一台机器访问 Jenkins](#5-从另一台机器访问-jenkins)
+5. [从另一台机器访问（Windows）](#5-从另一台机器访问windows)
+5a. [Windows 上的典型使用流程](#5a-windows-上的典型使用流程)
 6. [构建任务：Build_HelloWorld_Simple（参数化构建）](#6-构建任务build_helloworld_simple参数化构建)
 7. [触发构建](#7-触发构建)
 8. [查看构建结果](#8-查看构建结果)
@@ -129,49 +130,55 @@ http://localhost:8080
 
 ---
 
-## 5. 从另一台机器访问 Jenkins
+## 5. 从另一台机器访问（Windows）
 
 ### 问题
 
-如果你在另一台机器上（比如 Windows 笔记本），即使 `ping` 能通，端口 8080 也可能被两台机器之间的网络防火墙拦截。
+如果你在另一台机器上（比如 Windows 笔记本），即使 `ping` 能通，端口 8080（Jenkins）和 9090（BuildWeb）也可能被两台机器之间的网络防火墙拦截。
 
 ### 解决方案：SSH 隧道
 
 SSH 隧道就像一条**秘密地下通道** — 它把你的 HTTP 流量包裹在加密的 SSH 连接（端口 22）里传输，而防火墙通常允许 SSH 通过。
 
 ```
- Windows 笔记本                          Linux 宿主机
- ┌──────────┐     SSH（端口 22）     ┌──────────────┐
- │ 浏览器    │ ═══════════════════> │ SSH 服务器    │
- │ localhost │     （加密传输）      │    ↓          │
- │ :8080     │ <═══════════════════ │ Jenkins :8080 │
- └──────────┘                       └──────────────┘
+ Windows 笔记本                          Linux 宿主机 (10.227.226.50)
+ ┌──────────┐     SSH（端口 22）     ┌────────────────────┐
+ │ 浏览器    │ ═══════════════════> │ SSH 服务器          │
+ │ localhost │     （加密传输）      │    ↓                │
+ │ :8080     │ <═══════════════════ │ Jenkins :8080       │
+ │ :9090     │ <═══════════════════ │ BuildWeb :9090      │
+ └──────────┘                       └────────────────────┘
 ```
 
 #### 方式 A：PowerShell / Windows 终端（自带 OpenSSH）
 
 ```powershell
-ssh -L 8080:localhost:8080 root@<LINUX宿主机IP>
+ssh -L 8080:localhost:8080 -L 9090:localhost:9090 root@<LINUX宿主机IP>
 ```
 
-然后在浏览器打开：**http://localhost:8080**
+保持这个窗口不要关闭（关了隧道就断了）。然后在浏览器打开：
+- **http://localhost:8080** — Jenkins
+- **http://localhost:9090** — BuildWeb
 
 #### 方式 B：PuTTY
 
 1. 打开 PuTTY，输入 Host: `<LINUX宿主机IP>`，Port: `22`
 2. 进入 **Connection → SSH → Tunnels**
-3. Source port: `8080`
-4. Destination: `localhost:8080`
-5. 点击 **Add**
-6. 点击 **Open**，登录
-7. 在浏览器打开：**http://localhost:8080**
+3. Source port: `8080`，Destination: `localhost:8080` → 点击 **Add**
+4. Source port: `9090`，Destination: `localhost:9090` → 点击 **Add**
+5. 点击 **Open**，登录
+6. 在浏览器打开：
+   - **http://localhost:8080** — Jenkins
+   - **http://localhost:9090** — BuildWeb
 
 #### 方式 C：VS Code Remote SSH
 
 如果你使用 VS Code 的 Remote-SSH 扩展：
 1. 连接到 Linux 宿主机
 2. VS Code 会自动转发端口
-3. 在本地浏览器打开 **http://localhost:8080**
+3. 在本地浏览器打开：
+   - **http://localhost:8080** — Jenkins
+   - **http://localhost:9090** — BuildWeb
 
 #### 验证连通性（在 Windows 上）
 
@@ -179,10 +186,93 @@ ssh -L 8080:localhost:8080 root@<LINUX宿主机IP>
 # 测试 SSH 是否能通
 ssh root@<LINUX宿主机IP> "echo OK"
 
-# 建立 SSH 连接后，测试隧道是否生效
+# 建立 SSH 连接后，测试两个隧道是否生效
 Test-NetConnection localhost -Port 8080
 # 期望结果：TcpTestSucceeded : True
+Test-NetConnection localhost -Port 9090
+# 期望结果：TcpTestSucceeded : True
 ```
+
+---
+
+## 5a. Windows 上的典型使用流程
+
+SSH 隧道建立后，以下是从 Windows 机器上完成"构建代码 → 查看结果 → 下载产物"的完整流程：
+
+### 第 1 步：触发构建（Jenkins）
+
+1. 在浏览器中打开 **http://localhost:8080**
+2. 点击 **Build_HelloWorld_Simple**
+3. 点击左侧栏的 **Build with Parameters**
+4. 填写参数（使用默认值即可）：
+
+| 参数 | 值 | 说明 |
+|---|---|---|
+| REPO_NAME | `hello_world` | Git 仓库名 |
+| BRANCH | `main` | 要构建的分支 |
+| GIT_BASE_URL | `https://eos2git.cec.lab.emc.com/mam28` | 默认值，无需修改 |
+
+5. 点击 **Build**（构建）
+6. 等待约 15 秒，构建完成
+
+### 第 2 步：查看构建结果（BuildWeb）
+
+1. 在浏览器中打开 **http://localhost:9090**
+2. 你会看到构建仪表盘：
+
+```
+ ┌──────────────────────────────────────────────────────┐
+ │  MyBuildWeb                         Builds: 3        │
+ ├──────────────────────────────────────────────────────┤
+ │  Branch: hello_world | Succeeded: 3 | Failed: 0     │
+ ├──────────────────────────────────────────────────────┤
+ │  ┌──────────────────────（绿色）──────────────────┐  │
+ │  │ hello_world_003                                │  │
+ │  │ 状态: Succeeded  耗时: 0:00:12                 │  │
+ │  │ Git: a0cb1d6be0e4  机器: sles15sp6             │  │
+ │  │ [main (16.3 KB)] [main.o (3.2 KB)] [.tar.gz]  │  │
+ │  └────────────────────────────────────────────────┘  │
+ │  ┌──────────────────────（绿色）──────────────────┐  │
+ │  │ hello_world_002                                │  │
+ │  │ ...                                            │  │
+ │  └────────────────────────────────────────────────┘  │
+ └──────────────────────────────────────────────────────┘
+```
+
+3. **绿色卡片** = 构建成功，**红色卡片** = 构建失败
+4. 每张卡片显示：构建名称、状态、耗时、git hash、机器名
+
+### 第 3 步：下载产物
+
+**通过 Web 界面：**
+- 点击构建卡片上的绿色/蓝色下载按钮
+- `main` — 编译好的 ELF 二进制文件
+- `main.o` — 目标文件
+- `hello_world-src.tar.gz` — 源代码压缩包
+
+**通过 PowerShell：**
+```powershell
+# 下载编译好的二进制文件
+Invoke-WebRequest http://localhost:9090/download/hello_world_003/main -OutFile main
+
+# 下载源码压缩包
+Invoke-WebRequest http://localhost:9090/download/hello_world_003/hello_world-src.tar.gz -OutFile hello_world-src.tar.gz
+```
+
+### 第 4 步：查看控制台日志
+
+点击 BuildWeb 仪表盘上的构建名称（如 `hello_world_003`），即可查看完整的控制台输出 — 与 Jenkins Console Output 中看到的日志内容相同。
+
+### 快速参考卡
+
+| 操作 | 位置 | URL |
+|---|---|---|
+| 触发构建 | Jenkins | http://localhost:8080/job/Build_HelloWorld_Simple/build |
+| 查看所有构建 | BuildWeb | http://localhost:9090 |
+| 查看构建详情 | BuildWeb | http://localhost:9090/build/hello_world_003 |
+| 下载产物 | BuildWeb | http://localhost:9090/download/hello_world_003/main |
+| 构建列表（JSON） | BuildWeb API | http://localhost:9090/api/builds |
+| Jenkins 控制台日志 | Jenkins | http://localhost:8080/job/Build_HelloWorld_Simple/lastBuild/console |
 
 ---
 
@@ -670,7 +760,7 @@ docker-compose up -d
 ### 从远程机器访问不了 8080 端口
 1. 在宿主机上确认 Jenkins 正常运行：`curl http://localhost:8080/`
 2. 检查防火墙：`iptables -L INPUT -n`
-3. 使用 SSH 隧道（参见[第 5 节](#5-从另一台机器访问-jenkins)）
+3. 使用 SSH 隧道（参见[第 5 节](#5-从另一台机器访问windows)）
 
 ### API 调用报 "No valid crumb" 错误
 必须使用会话 Cookie 配合 CSRF 令牌：

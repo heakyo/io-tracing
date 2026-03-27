@@ -11,7 +11,8 @@
 2. [Architecture Overview](#2-architecture-overview)
 3. [Prerequisites](#3-prerequisites)
 4. [Quick Start: Launch Jenkins](#4-quick-start-launch-jenkins)
-5. [Access Jenkins from Another Machine](#5-access-jenkins-from-another-machine)
+5. [Access from Another Machine (Windows)](#5-access-from-another-machine-windows)
+5a. [Typical Usage Workflow from Windows](#5a-typical-usage-workflow-from-windows)
 6. [The Build Job: Build_HelloWorld_Simple (Build with Parameters)](#6-the-build-job-build_helloworld_simple-build-with-parameters)
 7. [Trigger a Build](#7-trigger-a-build)
 8. [View Build Results](#8-view-build-results)
@@ -129,49 +130,55 @@ http://localhost:8080
 
 ---
 
-## 5. Access Jenkins from Another Machine
+## 5. Access from Another Machine (Windows)
 
 ### The Problem
 
-If you're on a different machine (e.g., a Windows laptop), port 8080 may be blocked by network firewalls between the two machines, even if `ping` works.
+If you're on a different machine (e.g., a Windows laptop), ports 8080 (Jenkins) and 9090 (BuildWeb) may be blocked by network firewalls between the two machines, even if `ping` works.
 
 ### The Solution: SSH Tunnel
 
 An SSH tunnel is like a **secret underground passage** — it wraps your HTTP traffic inside an encrypted SSH connection (port 22), which firewalls typically allow.
 
 ```
- Windows laptop                         Linux host
- ┌──────────┐     SSH (port 22)     ┌──────────────┐
- │ Browser   │ ═══════════════════> │ SSH server    │
- │ localhost │     (encrypted)      │    ↓          │
- │ :8080     │ <═══════════════════ │ Jenkins :8080 │
- └──────────┘                       └──────────────┘
+ Windows laptop                         Linux host (10.227.226.50)
+ ┌──────────┐     SSH (port 22)     ┌────────────────────┐
+ │ Browser   │ ═══════════════════> │ SSH server         │
+ │ localhost │     (encrypted)      │    ↓               │
+ │ :8080     │ <═══════════════════ │ Jenkins :8080      │
+ │ :9090     │ <═══════════════════ │ BuildWeb :9090     │
+ └──────────┘                       └────────────────────┘
 ```
 
 #### Option A: PowerShell / Windows Terminal (OpenSSH built-in)
 
 ```powershell
-ssh -L 8080:localhost:8080 root@<LINUX_HOST_IP>
+ssh -L 8080:localhost:8080 -L 9090:localhost:9090 root@<LINUX_HOST_IP>
 ```
 
-Then open in browser: **http://localhost:8080**
+Keep this window open (closing it breaks the tunnel). Then open in browser:
+- **http://localhost:8080** — Jenkins
+- **http://localhost:9090** — BuildWeb
 
 #### Option B: PuTTY
 
 1. Open PuTTY, enter Host: `<LINUX_HOST_IP>`, Port: `22`
 2. Go to **Connection → SSH → Tunnels**
-3. Source port: `8080`
-4. Destination: `localhost:8080`
-5. Click **Add**
-6. Click **Open**, log in
-7. Open browser: **http://localhost:8080**
+3. Source port: `8080`, Destination: `localhost:8080` → Click **Add**
+4. Source port: `9090`, Destination: `localhost:9090` → Click **Add**
+5. Click **Open**, log in
+6. Open browser:
+   - **http://localhost:8080** — Jenkins
+   - **http://localhost:9090** — BuildWeb
 
 #### Option C: VS Code Remote SSH
 
 If you use VS Code with the Remote-SSH extension:
 1. Connect to the Linux host
 2. VS Code automatically forwards ports
-3. Open **http://localhost:8080** in your local browser
+3. Open in your local browser:
+   - **http://localhost:8080** — Jenkins
+   - **http://localhost:9090** — BuildWeb
 
 #### Verify Connectivity (from Windows)
 
@@ -179,10 +186,93 @@ If you use VS Code with the Remote-SSH extension:
 # Test if SSH works
 ssh root@<LINUX_HOST_IP> "echo OK"
 
-# Test if the tunnel works (after establishing the SSH connection)
+# Test if both tunnels work (after establishing the SSH connection)
 Test-NetConnection localhost -Port 8080
 # Expected: TcpTestSucceeded : True
+Test-NetConnection localhost -Port 9090
+# Expected: TcpTestSucceeded : True
 ```
+
+---
+
+## 5a. Typical Usage Workflow from Windows
+
+Once the SSH tunnel is established, here is the complete workflow for building code and downloading artifacts from your Windows machine:
+
+### Step 1: Trigger a Build (Jenkins)
+
+1. Open **http://localhost:8080** in your browser
+2. Click **Build_HelloWorld_Simple**
+3. Click **Build with Parameters** in the left sidebar
+4. Fill in the parameters (defaults are fine):
+
+| Parameter | Value | Notes |
+|---|---|---|
+| REPO_NAME | `hello_world` | Git repository name |
+| BRANCH | `main` | Branch to build |
+| GIT_BASE_URL | `https://eos2git.cec.lab.emc.com/mam28` | Default, no change needed |
+
+5. Click **Build**
+6. Wait ~15 seconds for the build to complete
+
+### Step 2: View Build Results (BuildWeb)
+
+1. Open **http://localhost:9090** in your browser
+2. You'll see the build dashboard:
+
+```
+ ┌──────────────────────────────────────────────────────┐
+ │  MyBuildWeb                    Builds: 3             │
+ ├──────────────────────────────────────────────────────┤
+ │  Branch: hello_world | Succeeded: 3 | Failed: 0     │
+ ├──────────────────────────────────────────────────────┤
+ │  ┌─────────────────────── (green) ────────────────┐  │
+ │  │ hello_world_003                                │  │
+ │  │ Status: Succeeded  Duration: 0:00:12           │  │
+ │  │ Git: a0cb1d6be0e4  Machine: sles15sp6          │  │
+ │  │ [main (16.3 KB)] [main.o (3.2 KB)] [.tar.gz]  │  │
+ │  └────────────────────────────────────────────────┘  │
+ │  ┌─────────────────────── (green) ────────────────┐  │
+ │  │ hello_world_002                                │  │
+ │  │ ...                                            │  │
+ │  └────────────────────────────────────────────────┘  │
+ └──────────────────────────────────────────────────────┘
+```
+
+3. **Green card** = build succeeded, **Red card** = build failed
+4. Each card shows: build name, status, duration, git hash, machine
+
+### Step 3: Download Artifacts
+
+**From the Web UI:**
+- Click any green/blue download button on the build card
+- `main` — the compiled ELF binary
+- `main.o` — the object file
+- `hello_world-src.tar.gz` — source code tarball
+
+**From PowerShell:**
+```powershell
+# Download the compiled binary
+Invoke-WebRequest http://localhost:9090/download/hello_world_003/main -OutFile main
+
+# Download source tarball
+Invoke-WebRequest http://localhost:9090/download/hello_world_003/hello_world-src.tar.gz -OutFile hello_world-src.tar.gz
+```
+
+### Step 4: View Console Log
+
+Click the build name (e.g., `hello_world_003`) on the BuildWeb dashboard to see the full console output — the same log you'd see in Jenkins Console Output.
+
+### Quick Reference Card
+
+| Action | Where | URL |
+|---|---|---|
+| Trigger a build | Jenkins | http://localhost:8080/job/Build_HelloWorld_Simple/build |
+| View all builds | BuildWeb | http://localhost:9090 |
+| View build detail | BuildWeb | http://localhost:9090/build/hello_world_003 |
+| Download artifact | BuildWeb | http://localhost:9090/download/hello_world_003/main |
+| Build list (JSON) | BuildWeb API | http://localhost:9090/api/builds |
+| Jenkins console log | Jenkins | http://localhost:8080/job/Build_HelloWorld_Simple/lastBuild/console |
 
 ---
 
