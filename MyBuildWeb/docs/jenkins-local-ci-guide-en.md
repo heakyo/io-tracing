@@ -1,7 +1,7 @@
 # Local Jenkins CI — User Guide
 
 > **Feynman Principle**: If you can't explain it simply, you don't understand it well enough.
-> This guide teaches you how to run a local Jenkins CI server via Docker and use it to automatically build the Hello World C program — as if you were learning it for the first time.
+> This guide teaches you how to run a local Jenkins CI server via Docker, use it to automatically build the Hello World C program, and browse build history through MyBuildWeb — as if you were learning it for the first time.
 
 ---
 
@@ -16,10 +16,11 @@
 7. [Trigger a Build](#7-trigger-a-build)
 8. [View Build Results](#8-view-build-results)
 9. [Find Build Artifacts](#9-find-build-artifacts)
-10. [Common Operations](#10-common-operations)
-11. [File Structure](#11-file-structure)
-12. [Troubleshooting](#12-troubleshooting)
-13. [Glossary](#13-glossary)
+10. [MyBuildWeb: Build History Dashboard](#10-mybuildweb-build-history-dashboard)
+11. [Common Operations](#11-common-operations)
+12. [File Structure](#12-file-structure)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Glossary](#14-glossary)
 
 ---
 
@@ -31,6 +32,7 @@ This project sets up:
 - A **Jenkins server** running inside a Docker container
 - A **GCC compiler toolchain** baked into the same container
 - A **pre-configured build job** that compiles and runs the Hello World C program in `src/`
+- A **MyBuildWeb dashboard** (inspired by Isilon BuildWeb) for browsing build history and downloading artifacts
 
 ### The Analogy
 
@@ -42,27 +44,34 @@ Imagine you have a personal chef (Jenkins) who lives in a portable kitchen (Dock
 
 ```
  Your Machine (Linux Host)
- ┌─────────────────────────────────────────────────────┐
- │                                                     │
- │  docker-compose.yml                                 │
- │  ┌───────────────────────────────────────────────┐  │
- │  │  Container: jenkins-hello                     │  │
- │  │  ┌─────────────┐  ┌────────────────────────┐  │  │
- │  │  │  Jenkins     │  │  GCC 15 + Make 4.4     │  │  │
- │  │  │  (port 8080) │  │  (compiler toolchain)  │  │  │
- │  │  └─────────────┘  └────────────────────────┘  │  │
- │  │                                               │  │
- │  │  Volume mount: ./ → /var/jenkins_home/project │  │
- │  └───────────────────────────────────────────────┘  │
- │                                                     │
- │  src/main.c + Makefile  ←── your source code        │
- └─────────────────────────────────────────────────────┘
+ ┌──────────────────────────────────────────────────────────────┐
+ │                                                              │
+ │  docker-compose.yml                                          │
+ │  ┌───────────────────────────────────────────────┐           │
+ │  │  Container: jenkins-hello                     │           │
+ │  │  ┌─────────────┐  ┌────────────────────────┐  │           │
+ │  │  │  Jenkins     │  │  GCC 15 + Make 4.4     │  │           │
+ │  │  │  (port 8080) │  │  (compiler toolchain)  │  │           │
+ │  │  └─────────────┘  └────────────────────────┘  │           │
+ │  │                                               │           │
+ │  │  Volume: jenkins_home (build data + artifacts)│           │
+ │  └─────────────┬─────────────────────────────────┘           │
+ │                │ reads buildweb_data/                         │
+ │                ▼                                              │
+ │  ┌───────────────────────────────────────────────┐           │
+ │  │  MyBuildWeb Server (Python)                   │           │
+ │  │  port 9090 — build history + artifact download│           │
+ │  └───────────────────────────────────────────────┘           │
+ │                                                              │
+ │  src/main.c + Makefile  ←── your source code                 │
+ └──────────────────────────────────────────────────────────────┘
 
  Windows / Remote Machine
- ┌────────────────────────────┐
- │  Browser → SSH Tunnel      │──── SSH (port 22) ────→ Host:8080
- │  http://localhost:8080     │
- └────────────────────────────┘
+ ┌─────────────────────────────────┐
+ │  Browser → SSH Tunnel           │──── SSH (port 22) ────→ Host:8080 (Jenkins)
+ │  http://localhost:8080 (Jenkins)│──── SSH (port 22) ────→ Host:9090 (BuildWeb)
+ │  http://localhost:9090 (Build)  │
+ └─────────────────────────────────┘
 ```
 
 ### How the Pieces Fit Together
@@ -74,6 +83,7 @@ Imagine you have a personal chef (Jenkins) who lives in a portable kitchen (Dock
 | `Jenkinsfile` | Pipeline definition for the build | The recipe |
 | `src/main.c` | The C program to compile | The ingredients |
 | `src/Makefile` | Build instructions for Make | Cooking instructions |
+| `buildweb/server.py` | Build history dashboard + artifact server | The restaurant menu board |
 
 ---
 
@@ -403,7 +413,179 @@ curl -s -O http://localhost:8080/job/Build_HelloWorld_Simple/ws/repo/main
 
 ---
 
-## 10. Common Operations
+## 10. MyBuildWeb: Build History Dashboard
+
+MyBuildWeb is a lightweight HTTP server (inspired by Isilon's `build.west.isilon.com`) that provides a **web-based dashboard** for browsing build history and downloading artifacts. It reads build metadata from the Jenkins Docker volume — no database required.
+
+### The Analogy
+
+If Jenkins is the chef who cooks your food, MyBuildWeb is the **restaurant display window** — it shows every dish (build) the chef has ever made: when it was cooked, whether it turned out well, and lets you take the finished dish home (download artifacts).
+
+### How It Works
+
+```
+ Jenkins (inside Docker)              MyBuildWeb (on host)
+ ┌──────────────────────┐            ┌──────────────────────────────┐
+ │ Build completes →    │            │                              │
+ │ Saves to volume:     │            │  Reads from Docker volume:   │
+ │  buildweb_data/      │───────────→│  /var/lib/docker/volumes/    │
+ │   hello_world_001/   │            │   mybuildweb_jenkins_home/   │
+ │    build_meta.json   │            │    _data/buildweb_data/      │
+ │    artifacts/        │            │                              │
+ │     main             │            │  Serves on port 9090:        │
+ │     main.o           │            │  - Web UI (build history)    │
+ │     *.tar.gz         │            │  - JSON API                  │
+ └──────────────────────┘            │  - File downloads            │
+                                     └──────────────────────────────┘
+```
+
+### Start the BuildWeb Server
+
+```bash
+# Set the builds directory to the Jenkins Docker volume
+export BUILDS_DIR="/var/lib/docker/volumes/mybuildweb_jenkins_home/_data/buildweb_data"
+export BUILDWEB_PORT=9090
+
+# Start in the background
+cd /path/to/io-tracing/MyBuildWeb
+nohup python3 buildweb/server.py > /tmp/buildweb.log 2>&1 &
+
+# Verify it's running
+curl -s -o /dev/null -w "%{http_code}" http://localhost:9090/
+# Expected: 200
+```
+
+### Access the Web UI
+
+Open in your browser:
+```
+http://localhost:9090
+```
+
+You'll see a dashboard with:
+- **Summary bar** — total builds, succeeded count, failed count
+- **Build cards** — one card per build, color-coded:
+  - Green: Succeeded
+  - Red: Failed
+  - Cyan: Running
+- **Metadata per build** — name, status, duration, start/end time, git hash, machine, build number
+- **Download buttons** — click to download any artifact (binary, object file, source tarball)
+
+### Access from a Remote Machine (SSH Tunnel)
+
+Just like Jenkins, MyBuildWeb requires an SSH tunnel for remote access. You can tunnel both ports in a single SSH command:
+
+```powershell
+# Forward both Jenkins (8080) and BuildWeb (9090)
+ssh -L 8080:localhost:8080 -L 9090:localhost:9090 root@<LINUX_HOST_IP>
+```
+
+Then open in browser:
+- Jenkins: **http://localhost:8080**
+- BuildWeb: **http://localhost:9090**
+
+### Build Detail Page
+
+Click any build name (e.g., `hello_world_001`) to see the **build detail page**, which includes:
+- Full build metadata table
+- Console output log (same as Jenkins Console Output)
+
+URL pattern: `http://localhost:9090/build/hello_world_001`
+
+### JSON API
+
+MyBuildWeb provides a JSON API for programmatic access:
+
+```bash
+# List all builds
+curl -s http://localhost:9090/api/builds | python3 -m json.tool
+```
+
+Example response:
+```json
+[
+  {
+    "build_name": "hello_world_003",
+    "status": "Succeeded",
+    "duration": "12",
+    "start_time": "2026-03-27 04:30:00",
+    "end_time": "2026-03-27 04:30:12",
+    "started_by": "anonymous",
+    "machine": "sles15sp6",
+    "build_number": "003",
+    "git_hash": "a0cb1d6be0e4...",
+    "git_repo": "hello_world",
+    "last_step": "Test"
+  }
+]
+```
+
+### Download Artifacts
+
+#### From the Web UI
+
+Each build card has download buttons for all artifacts. Click to download directly.
+
+#### From the Command Line
+
+```bash
+# Download the compiled binary
+curl -s -O http://localhost:9090/download/hello_world_001/main
+
+# Download source tarball
+curl -s -O http://localhost:9090/download/hello_world_001/hello_world-src.tar.gz
+
+# Download object file
+curl -s -O http://localhost:9090/download/hello_world_001/main.o
+```
+
+#### URL Pattern
+
+```
+http://localhost:9090/download/{build_name}/{filename}
+```
+
+### Build Data Structure
+
+Each build is stored as a directory under `buildweb_data/`:
+
+```
+buildweb_data/
+├── hello_world_001/
+│   ├── build_meta.json      ← Build metadata (status, time, git hash, etc.)
+│   ├── console.log          ← Jenkins console output
+│   └── artifacts/
+│       ├── main             ← Compiled ELF binary
+│       ├── main.o           ← Object file
+│       └── hello_world-src.tar.gz  ← Source code tarball
+├── hello_world_002/
+│   ├── build_meta.json
+│   ├── console.log
+│   └── artifacts/
+│       └── ...
+└── ...
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `BUILDS_DIR` | `/var/jenkins_home/buildweb_data` | Path to the builds data directory |
+| `BUILDWEB_PORT` | `8081` | Port to listen on (we override to `9090`) |
+
+### Stop the BuildWeb Server
+
+```bash
+# Find the process
+ps aux | grep 'buildweb/server.py' | grep -v grep
+
+# Kill it
+kill $(ps aux | grep 'buildweb/server.py' | grep -v grep | awk '{print $2}')
+```
+
+---
+
+## 11. Common Operations
 
 | Task | Command |
 |---|---|
@@ -415,16 +597,21 @@ curl -s -O http://localhost:8080/job/Build_HelloWorld_Simple/ws/repo/main
 | Enter container shell | `docker exec -it jenkins-hello bash` |
 | Test GCC inside container | `docker exec jenkins-hello gcc --version` |
 | Delete all data (fresh start) | `docker-compose down -v` |
+| Start BuildWeb server | `BUILDS_DIR=/var/lib/docker/volumes/mybuildweb_jenkins_home/_data/buildweb_data BUILDWEB_PORT=9090 nohup python3 buildweb/server.py &` |
+| Stop BuildWeb server | `kill $(ps aux \| grep server.py \| grep -v grep \| awk '{print $2}')` |
+| Open BuildWeb | `http://localhost:9090` |
 
 ---
 
-## 11. File Structure
+## 12. File Structure
 
 ```
 MyBuildWeb/
 ├── Dockerfile              ← Custom Jenkins + GCC image definition
 ├── docker-compose.yml      ← Docker Compose service configuration
 ├── Jenkinsfile             ← Pipeline definition (for SCM-based jobs)
+├── buildweb/
+│   └── server.py           ← MyBuildWeb dashboard server (Python, port 9090)
 ├── src/
 │   ├── main.c              ← Hello World C source code
 │   └── Makefile            ← Build rules: main.c → main.o → main
@@ -450,7 +637,7 @@ The Dockerfile uses a multi-stage approach to get GCC into the Jenkins image:
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 ### Jenkins won't start
 ```bash
@@ -479,6 +666,16 @@ CRUMB_JSON=$(curl -s -c "$COOKIE_JAR" 'http://localhost:8080/crumbIssuer/api/jso
 # Then pass -b "$COOKIE_JAR" in subsequent requests
 ```
 
+### BuildWeb shows "No builds yet"
+1. Verify builds exist: `ls /var/lib/docker/volumes/mybuildweb_jenkins_home/_data/buildweb_data/`
+2. Check `BUILDS_DIR` is set correctly when starting the server
+3. Trigger a build from Jenkins and wait for it to complete
+
+### BuildWeb port 9090 not reachable
+1. Check the server is running: `ps aux | grep server.py`
+2. Verify locally: `curl http://localhost:9090/`
+3. For remote access, use SSH tunnel: `ssh -L 9090:localhost:9090 root@<LINUX_HOST_IP>`
+
 ### Start fresh (delete all Jenkins data)
 ```bash
 docker-compose down -v    # -v removes the named volume
@@ -488,7 +685,7 @@ docker-compose up -d      # Recreates everything
 
 ---
 
-## 13. Glossary
+## 14. Glossary
 
 | Term | Definition |
 |---|---|
@@ -508,7 +705,10 @@ docker-compose up -d      # Recreates everything
 | **PAT** | Personal Access Token — a password substitute for authenticating to Git servers via HTTPS |
 | **.netrc** | A file that stores machine credentials for automatic login by tools like `git` and `curl` |
 | **Workspace** | The directory inside Jenkins where a job's files are checked out and built |
+| **MyBuildWeb** | A lightweight build history dashboard inspired by Isilon BuildWeb — shows build metadata and downloadable artifacts |
+| **BuildWeb** | Isilon's internal build results website (`build.west.isilon.com`); MyBuildWeb is a simplified local version |
+| **build_meta.json** | A JSON file generated by each Jenkins build containing metadata (status, timing, git hash, etc.) |
 
 ---
 
-*Generated: 2026-03-27*
+*Updated: 2026-03-27*
