@@ -94,16 +94,18 @@ The Chinese version must be **native-quality Chinese**, not word-for-word transl
 
 ### Phase 5: Git Commit (ALWAYS)
 
-After documentation files are created or updated, **always** commit the changes:
+After ANY file is created or updated — including the skill itself, documentation in `docs/`, or any other generated file — **always** commit the changes:
 
-1. Stage the generated documentation files: `git add <output-dir>/*.md`
+1. Stage ALL changed files: `git add <output-dir>/*.md` and any other modified files (e.g. skill files, configs)
 2. Commit with `git commit -s` using a clean, descriptive message
 3. **Do NOT include any Devin-related information** in the commit message — no "Generated with Devin", no "Co-Authored-By: Devin" lines
-4. Commit message format:
+4. Commit message format examples:
    ```
    git commit -s -m "docs: update Feynman-style documentation for <project-name>"
+   git commit -s -m "docs: add <project-name> English and Chinese guides"
    ```
-5. Do NOT push unless explicitly asked
+5. If the `docs/` directory has pending changes from a previous step that were not yet committed, commit them **immediately** before moving on
+6. Do NOT push unless explicitly asked
 
 ## Quality Checklist
 
