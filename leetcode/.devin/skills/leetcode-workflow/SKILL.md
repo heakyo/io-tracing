@@ -112,6 +112,7 @@ When all test cases **pass** (the user's algorithm has no bugs), provide an opti
 3. The test cases in `optimized/main.c` **must be identical** to those in the original `main.c`.
 4. Copy or create a `Makefile` in `optimized/` so it can be built independently.
 5. Build and run `optimized/main.c` to verify all tests pass.
+6. Create `optimized/readme.md` (English) and `optimized/readme_cn.md` (中文) documenting the optimization approach. Use the same Feynman-style structure as the main readme (see Rule 5), but focused on the **optimized algorithm** — explain why it's faster, how it works, and compare with the original.
 
 Directory structure example:
 
@@ -119,10 +120,13 @@ Directory structure example:
 leetcode/001-two-sum/
 ├── Makefile
 ├── main.c              # original (untouched algorithm)
+├── readme.md           # English - original solution explanation
+├── readme_cn.md        # 中文 - 原始解法说明
 ├── optimized/
 │   ├── Makefile
-│   └── main.c          # optimal solution with same test cases
-└── readme.md
+│   ├── main.c          # optimal solution with same test cases
+│   ├── readme.md       # English - optimization explanation
+│   └── readme_cn.md    # 中文 - 优化思路说明
 ```
 
 ### 5. Documentation (readme.md / readme_cn.md)
@@ -150,6 +154,6 @@ Before finishing any leetcode task, verify:
 
 - [ ] Algorithm in `main.c` is untouched (only test code added).
 - [ ] If tests fail, `fixed/` directory exists with corrected code.
-- [ ] If tests pass, `optimized/` directory exists with optimal solution and identical test cases.
+- [ ] If tests pass, `optimized/` directory exists with optimal solution, identical test cases, and its own `readme.md` + `readme_cn.md`.
 - [ ] `readme.md` (English) and `readme_cn.md` (中文) both exist with TOC and Feynman-style explanation.
 - [ ] `git commit -s` has been executed for all changes.
