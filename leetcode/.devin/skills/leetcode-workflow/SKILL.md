@@ -112,7 +112,7 @@ When all test cases **pass** (the user's algorithm has no bugs), provide an opti
 3. The test cases in `optimized/main.c` **must be identical** to those in the original `main.c`.
 4. Copy or create a `Makefile` in `optimized/` so it can be built independently.
 5. Build and run `optimized/main.c` to verify all tests pass.
-6. Create `optimized/readme.md` (English) and `optimized/readme_cn.md` (中文) documenting the optimization approach. Use the same Feynman-style structure as the main readme (see Rule 5), but focused on the **optimized algorithm** — explain why it's faster, how it works, and compare with the original.
+6. Create `optimized/readme.md` (English) and `optimized/readme_cn.md` (中文) documenting the optimization approach. Use the same Feynman-style structure as the main readme (see Rule 5), but focused on the **optimized algorithm** — explain why it's faster, how it works, and compare with the original. Additionally, include a **Function Reference** section that lists every function defined in `optimized/main.c` with its signature, purpose, parameters, and return value.
 
 Directory structure example:
 

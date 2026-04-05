@@ -4,6 +4,7 @@
 
 - [为什么要优化？](#为什么要优化)
 - [核心思路](#核心思路)
+- [函数说明](#函数说明)
 - [逐步演练](#逐步演练)
 - [容易踩的坑](#容易踩的坑)
 - [复杂度分析](#复杂度分析)
@@ -29,6 +30,21 @@
 这样每个人只需看一次公告板，走一遍房间就搞定了。
 
 在代码中，"公告板"就是哈希表，存储 `数字 -> 下标` 的映射。对于每个元素，计算 `complement = target - nums[i]`，在哈希表中查找，找到就返回结果，找不到就把当前元素插入哈希表。
+
+---
+
+## 函数说明
+
+| 函数 | 签名 | 作用 |
+|------|------|------|
+| `ht_init` | `void ht_init(struct ht_entry *ht)` | 初始化哈希表 —— 将所有槽位清零，标记为未使用。 |
+| `ht_hash` | `unsigned int ht_hash(int key)` | 计算给定整数键的哈希索引。使用位混合（乘法-移位）并转换为 `unsigned int` 以处理负数。返回值范围 `[0, HT_SIZE)`。 |
+| `ht_get` | `int ht_get(struct ht_entry *ht, int key, int *val)` | 在哈希表中查找 `key`。命中时将存储的值（数组下标）写入 `*val` 并返回 `1`；未命中返回 `0`。使用线性探测解决冲突。 |
+| `ht_put` | `void ht_put(struct ht_entry *ht, int key, int val)` | 向哈希表插入键值对。`key` 是 `nums` 中的数字，`val` 是它的下标。使用线性探测找到第一个空槽位。 |
+| `twoSum` | `int *twoSum(int *nums, int numsSize, int target, int *returnSize)` | 核心算法。分配 2 元素结果数组，创建哈希表，遍历 `nums`。对每个元素检查 `target - nums[i]` 是否在表中；如果在则返回下标对，否则插入当前元素。调用者须 `free()` 返回的数组。 |
+| `print_array` | `void print_array(const char *label, int *array, int len)` | 辅助函数，带标签打印数组，如 `Input:  [3 2 3]`。用于测试输出。 |
+| `run_test` | `void run_test(const char *name, int *nums, int numsSize, int target, int exp0, int exp1)` | 执行单个测试用例：打印输入，调用 `twoSum`，用 `assert` 校验结果，打印 PASS。 |
+| `main` | `int main(int argc, char *argv[])` | 程序入口。运行全部 10 个测试用例，成功后打印 "All tests passed!"。 |
 
 ---
 

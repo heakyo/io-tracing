@@ -4,6 +4,7 @@
 
 - [Why Optimize?](#why-optimize)
 - [Core Idea](#core-idea)
+- [Function Reference](#function-reference)
 - [Step-by-Step Walkthrough](#step-by-step-walkthrough)
 - [Where It Gets Tricky](#where-it-gets-tricky)
 - [Complexity Analysis](#complexity-analysis)
@@ -29,6 +30,21 @@ Imagine the same room full of people holding number cards. Instead of comparing 
 This way, each person only needs to glance at the board once. One pass through the room, and you're done.
 
 In code, the "bulletin board" is a hash table that maps `number -> index`. For each element, we compute `complement = target - nums[i]`, look it up in the hash table, and either return the answer or insert the current element.
+
+---
+
+## Function Reference
+
+| Function | Signature | Purpose |
+|----------|-----------|---------|
+| `ht_init` | `void ht_init(struct ht_entry *ht)` | Initialize the hash table — zero out all slots, marking them as unused. |
+| `ht_hash` | `unsigned int ht_hash(int key)` | Compute a hash index for a given integer key. Uses bit-mixing (multiply-shift) and casts to `unsigned int` to handle negatives. Returns a value in `[0, HT_SIZE)`. |
+| `ht_get` | `int ht_get(struct ht_entry *ht, int key, int *val)` | Look up `key` in the hash table. On hit, writes the stored value (array index) into `*val` and returns `1`. On miss, returns `0`. Uses linear probing to resolve collisions. |
+| `ht_put` | `void ht_put(struct ht_entry *ht, int key, int val)` | Insert a key-value pair into the hash table. `key` is the number from `nums`, `val` is its index. Uses linear probing to find the first empty slot. |
+| `twoSum` | `int *twoSum(int *nums, int numsSize, int target, int *returnSize)` | Main algorithm. Allocates a 2-element result array, creates a hash table, then iterates through `nums`. For each element, checks if `target - nums[i]` exists in the table; if yes returns the pair of indices, otherwise inserts the current element. Caller must `free()` the returned array. |
+| `print_array` | `void print_array(const char *label, int *array, int len)` | Helper to print an array with a label prefix, e.g. `Input:  [3 2 3]`. Used for test output. |
+| `run_test` | `void run_test(const char *name, int *nums, int numsSize, int target, int exp0, int exp1)` | Run a single test case: print input, call `twoSum`, verify result with `assert`, print PASS. |
+| `main` | `int main(int argc, char *argv[])` | Entry point. Runs all 10 test cases and prints "All tests passed!" on success. |
 
 ---
 
