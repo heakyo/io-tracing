@@ -14,34 +14,35 @@ void swap(int *a, int *b)
 	*b = tmp;
 }
 
-int quick_sort(int *array, int low, int high)
+void quick_sort(int *array, int low, int high)
 {
 	int pivot;
 	int i, j;
 
 	if (!array || low >= high)
-		return 0;
+		return;
 
-	/* Use last element as pivot, two-pointer partition */
-	pivot = array[high];
+	pivot = high;
 	i = low;
-	j = high - 1;
+	j = high;
 
-	while (i <= j) {
-		while (i <= j && array[i] <= pivot)
-			i++;
-		while (i <= j && array[j] > pivot)
-			j--;
-		if (i < j)
-			swap(&array[i], &array[j]);
+	while (i < j) {
+
+		while (i < pivot && array[i] <= array[pivot]) i++;
+		if (i < pivot) {
+			swap(&array[i], &array[pivot]);
+			pivot = i;
+		}
+
+		while (pivot < j && array[pivot] <= array[j]) j--;
+		if (pivot < j) {
+			swap(&array[pivot], &array[j]);
+			pivot = j;
+		}
 	}
-	/* Place pivot in its correct position */
-	swap(&array[i], &array[high]);
 
-	quick_sort(array, low, i - 1);
-	quick_sort(array, i + 1, high);
-
-	return 0;
+	quick_sort(array, 0, pivot - 1);
+	quick_sort(array, pivot + 1, high);
 }
 
 static void print_array(const char *label, int *array, int len)
