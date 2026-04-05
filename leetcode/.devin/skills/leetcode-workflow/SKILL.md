@@ -16,6 +16,7 @@ git add <changed files> && git commit -s -m "<message>"
 
 - Always use `-s` (Signed-off-by).
 - Commit message should follow the existing style: `<topic>: <short description>`.
+- **NEVER** include `Co-Authored-By: Devin` or any similar auto-generated co-author lines in commit messages.
 
 ### 2. Test Case Code Style
 
