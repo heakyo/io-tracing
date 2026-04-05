@@ -103,7 +103,29 @@ leetcode/sort/quick_sort/
 └── readme.md
 ```
 
-### 4. Documentation (readme.md)
+### 4. Optimized Solution
+
+When all test cases **pass** (the user's algorithm has no bugs), provide an optimized solution:
+
+1. Create an `optimized/` subdirectory in the **same directory** as the original `main.c`.
+2. Write the optimal algorithm in `optimized/main.c`.
+3. The test cases in `optimized/main.c` **must be identical** to those in the original `main.c`.
+4. Copy or create a `Makefile` in `optimized/` so it can be built independently.
+5. Build and run `optimized/main.c` to verify all tests pass.
+
+Directory structure example:
+
+```
+leetcode/001-two-sum/
+├── Makefile
+├── main.c              # original (untouched algorithm)
+├── optimized/
+│   ├── Makefile
+│   └── main.c          # optimal solution with same test cases
+└── readme.md
+```
+
+### 5. Documentation (readme.md)
 
 For every problem directory, create a `readme.md` in the **same directory** as `main.c`. The document must:
 
@@ -117,11 +139,12 @@ For every problem directory, create a `readme.md` in the **same directory** as `
   5. **Complexity Analysis** — Time and space complexity with brief justification.
   6. **Summary** — One-paragraph recap as if explaining to a friend.
 
-### 5. Checklist
+### 6. Checklist
 
 Before finishing any leetcode task, verify:
 
 - [ ] Algorithm in `main.c` is untouched (only test code added).
 - [ ] If tests fail, `fixed/` directory exists with corrected code.
+- [ ] If tests pass, `optimized/` directory exists with optimal solution and identical test cases.
 - [ ] `readme.md` exists with TOC and Feynman-style explanation.
 - [ ] `git commit -s` has been executed for all changes.
