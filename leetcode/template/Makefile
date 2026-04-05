@@ -4,7 +4,7 @@
 
 # 1. Compiler and Flags
 CC      = gcc
-CFLAGS  = -Wall -Wextra -O0 -g
+CFLAGS  = -O0 -g
 TARGET  = main
 
 # 2. Source and Object Files
