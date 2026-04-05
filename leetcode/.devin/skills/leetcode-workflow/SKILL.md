@@ -125,9 +125,14 @@ leetcode/001-two-sum/
 └── readme.md
 ```
 
-### 5. Documentation (readme.md)
+### 5. Documentation (readme.md / readme_cn.md)
 
-For every problem directory, create a `readme.md` in the **same directory** as `main.c`. The document must:
+For every problem directory, create **two** readme files in the **same directory** as `main.c`:
+
+- `readme.md` — **English** version.
+- `readme_cn.md` — **Chinese** (中文) version.
+
+Both files must have identical structure and content (just different languages):
 
 - Be written in **Markdown**.
 - Start with a **Table of Contents** (linked headings).
@@ -146,5 +151,5 @@ Before finishing any leetcode task, verify:
 - [ ] Algorithm in `main.c` is untouched (only test code added).
 - [ ] If tests fail, `fixed/` directory exists with corrected code.
 - [ ] If tests pass, `optimized/` directory exists with optimal solution and identical test cases.
-- [ ] `readme.md` exists with TOC and Feynman-style explanation.
+- [ ] `readme.md` (English) and `readme_cn.md` (中文) both exist with TOC and Feynman-style explanation.
 - [ ] `git commit -s` has been executed for all changes.
