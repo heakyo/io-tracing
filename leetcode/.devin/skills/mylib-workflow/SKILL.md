@@ -20,9 +20,8 @@ mylib/<library_name>/
 │   ├── main.c              # demo program showing how to use the library
 │   └── Makefile             # builds demo, links against the .so
 ├── Makefile                 # builds the dynamic library (.so)
-├── readme.md                # English documentation
-├── readme_cn.md             # Chinese documentation
-└── readme.qa                # Q&A style function usage guide
+├── readme.md                # English documentation (includes Q&A function usage guide)
+└── readme_cn.md             # Chinese documentation
 ```
 
 ### 2. Library Build
@@ -46,9 +45,8 @@ Each library directory must contain:
 
 - `readme.md` — **English** documentation.
 - `readme_cn.md` — **Chinese** (中文) documentation.
-- `readme.qa` — **Q&A style function usage guide**.
 
-`readme.md` and `readme_cn.md` must include:
+Both files must include:
 
 - **Table of Contents** (linked headings).
 - **Overview** — What the library does and when to use it.
@@ -56,15 +54,13 @@ Each library directory must contain:
 - **Build Instructions** — How to compile the library and the demo.
 - **Usage Example** — Code snippet showing typical usage.
 
-`readme.qa` must include:
+Additionally, `readme.md` must include a **Function Usage Q&A** section with one subsection per public function. Each subsection uses a Q&A format:
 
-- One section **per public function**.
-- Each section uses a **Q&A format**:
-  - **Q: What does this function do?** — Plain-language description.
-  - **Q: What are the parameters?** — Explain each parameter.
-  - **Q: What does it return?** — Return value and edge cases.
-  - **Q: How do I use it?** — A minimal code snippet.
-  - **Q: What should I watch out for?** — Common pitfalls or important notes.
+- **Q: What does this function do?** — Plain-language description.
+- **Q: What are the parameters?** — Explain each parameter.
+- **Q: What does it return?** — Return value and edge cases.
+- **Q: How do I use it?** — A minimal code snippet.
+- **Q: What should I watch out for?** — Common pitfalls or important notes.
 
 ### 5. Git Commit
 
@@ -79,6 +75,5 @@ Before finishing any mylib task, verify:
 
 - [ ] Library compiles to a `.so` file successfully.
 - [ ] `demo/main.c` builds, runs, and demonstrates all major API functions.
-- [ ] `readme.md` (English) and `readme_cn.md` (中文) both exist with API reference.
-- [ ] `readme.qa` exists with Q&A style usage guide for every public function.
+- [ ] `readme.md` (English) and `readme_cn.md` (中文) both exist with API reference and Q&A function usage guide.
 - [ ] `git commit -s` has been executed for all changes.
