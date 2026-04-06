@@ -7,6 +7,8 @@
 - [API Reference](#api-reference)
 - [Usage Example](#usage-example)
 - [Function Usage Q&A](#function-usage-qa)
+  - [Internal Functions (ht_hash, ht_resize)](#internal-functions)
+  - [Public Functions (ht_create, ht_destroy, ht_set, ht_get, ht_remove, ht_contains, ht_size, ht_iter_init, ht_iter_next)](#public-functions)
 
 ---
 
@@ -94,6 +96,56 @@ gcc -I/path/to/include -L/path/to/lib -lhashtable -o myapp myapp.c
 ---
 
 ## Function Usage Q&A
+
+### Internal Functions
+
+These are `static` functions not exposed in the public header, but they are the core engine of the library.
+
+#### ht_hash
+
+**Q: What does this function do?**
+Compute a bucket index for a given string key. This is the hash function that maps every key to a position in the bucket array.
+
+**Q: What algorithm does it use?**
+**FNV-1a** (Fowler-Noll-Vo). It starts with an offset basis `2166136261`, then for each byte of the key: XOR the byte into the hash, then multiply by the FNV prime `16777619`. Finally, take modulo `capacity` to get a bucket index.
+
+**Q: What is the signature?**
+```c
+static unsigned long ht_hash(const char *key, size_t cap)
+```
+- `key` — The null-terminated string key to hash.
+- `cap` — Current bucket array capacity (used for modulo).
+- Returns a value in `[0, cap)`.
+
+**Q: Why FNV-1a?**
+It's simple (no lookup tables), fast (one XOR + one multiply per byte), and has good distribution for short string keys typical in hash tables.
+
+**Q: What should I watch out for?**
+- This is an internal function — you never call it directly.
+- The quality of this function determines how evenly keys are distributed across buckets, which affects collision rate and performance.
+
+---
+
+#### ht_resize
+
+**Q: What does this function do?**
+Grow the bucket array when the load factor exceeds the threshold (75%). Allocates a new, larger array and re-inserts all existing entries.
+
+**Q: What is the signature?**
+```c
+static int ht_resize(hashtable_t *ht, size_t new_cap)
+```
+- `ht` — The hash table handle.
+- `new_cap` — The new capacity (typically `old_capacity * 2`).
+- Returns `0` on success, `-1` on failure.
+
+**Q: What should I watch out for?**
+- This is called automatically by `ht_set` — you never call it directly.
+- On failure, the original table is preserved unchanged.
+
+---
+
+### Public Functions
 
 ### ht_create
 
