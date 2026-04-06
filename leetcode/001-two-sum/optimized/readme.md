@@ -5,6 +5,7 @@
 - [Why Optimize?](#why-optimize)
 - [Core Idea](#core-idea)
 - [Function Reference](#function-reference)
+- [ASCII Flowchart](#ascii-flowchart)
 - [Step-by-Step Walkthrough](#step-by-step-walkthrough)
 - [Where It Gets Tricky](#where-it-gets-tricky)
 - [Complexity Analysis](#complexity-analysis)
@@ -45,6 +46,55 @@ In code, the "bulletin board" is a hash table that maps `number -> index`. For e
 | `print_array` | `void print_array(const char *label, int *array, int len)` | Helper to print an array with a label prefix, e.g. `Input:  [3 2 3]`. Used for test output. |
 | `run_test` | `void run_test(const char *name, int *nums, int numsSize, int target, int exp0, int exp1)` | Run a single test case: print input, call `twoSum`, verify result with `assert`, print PASS. |
 | `main` | `int main(int argc, char *argv[])` | Entry point. Runs all 10 test cases and prints "All tests passed!" on success. |
+
+---
+
+## ASCII Flowchart
+
+```
+         +---------------------+
+         |       Start         |
+         +---------------------+
+                   |
+                   v
+         +---------------------+
+         | alloc result[2]     |
+         | ht = ht_create()    |
+         | i = 0               |
+         +---------------------+
+                   |
+                   v
+         +---------------------+
+         |   i < numsSize ?    |
+         +---------------------+
+          /  yes          \  no
+         v                 v
+ +------------------+   +------------------+
+ | complement =     |   | ht_destroy(ht)   |
+ | target - nums[i] |   | return result    |
+ +------------------+   | (no match found) |
+         |              +------------------+
+         v
+ +------------------+
+ | ht_get(ht,       |
+ |   complement)    |
+ +------------------+
+    /  found    \  not found
+   v             v
+ +-------------+  +------------------+
+ | result[0] = |  | ht_set(ht,       |
+ |   saved idx |  |   nums[i], i+1)  |
+ | result[1] = |  +------------------+
+ |   i         |           |
+ +-------------+           v
+       |           +------------------+
+       v           |     i++          |
+ +-------------+   +------------------+
+ | ht_destroy  |           |
+ | return      |           |
+ | result      |    (loop back to
+ +-------------+     "i < numsSize ?")
+```
 
 ---
 
