@@ -62,6 +62,8 @@ Additionally, both `readme.md` and `readme_cn.md` must include a **Function Usag
 - **Q: How do I use it?** — A minimal code snippet.
 - **Q: What should I watch out for?** — Common pitfalls or important notes.
 
+**Important:** Whenever `readme.md` or `readme_cn.md` is updated, the other file **must** be updated in the same commit to keep both versions in sync.
+
 ### 5. Git Commit
 
 - All changes under `mylib/` **must** end with `git commit -s`.
