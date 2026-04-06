@@ -112,7 +112,7 @@ When all test cases **pass** (the user's algorithm has no bugs), provide an opti
 3. The test cases in `optimized/main.c` **must be identical** to those in the original `main.c`.
 4. Copy or create a `Makefile` in `optimized/` so it can be built independently.
 5. Build and run `optimized/main.c` to verify all tests pass.
-6. Create `optimized/readme.md` (English) and `optimized/readme_cn.md` (中文) documenting the optimization approach. Use the same Feynman-style structure as the main readme (see Rule 5), but focused on the **optimized algorithm** — explain why it's faster, how it works, and compare with the original. Additionally, include a **Function Reference** section that lists every function defined in `optimized/main.c` with its signature, purpose, parameters, and return value.
+6. Create `optimized/readme.md` (English) and `optimized/readme_cn.md` (中文) documenting the optimization approach. Use the same Feynman-style structure as the main readme (see Rule 5), but focused on the **optimized algorithm** — explain why it's faster, how it works, and compare with the original. Additionally, include a **Function Reference** section that lists every function defined in `optimized/main.c` with its signature, purpose, parameters, and return value. Must also include an **ASCII Flowchart** section showing the optimized algorithm's control flow using a text-based flowchart (see Rule 5).
 
 Directory structure example:
 
@@ -144,9 +144,10 @@ Both files must have identical structure and content (just different languages):
   1. **Problem Statement** — Describe the problem in plain language.
   2. **Core Idea** — Explain the key insight / algorithm in the simplest terms possible, using analogies if helpful.
   3. **Step-by-Step Walkthrough** — Walk through a concrete example by hand, showing every step.
-  4. **Where It Gets Tricky** — Identify the parts that are easy to get wrong and explain why.
-  5. **Complexity Analysis** — Time and space complexity with brief justification.
-  6. **Summary** — One-paragraph recap as if explaining to a friend.
+  4. **ASCII Flowchart** — An ASCII-art flowchart (inside a code block) showing the algorithm's control flow. Use boxes (`+--+`), arrows (`-->`, `|`, `v`), and decision diamonds to illustrate the main logic path.
+  5. **Where It Gets Tricky** — Identify the parts that are easy to get wrong and explain why.
+  6. **Complexity Analysis** — Time and space complexity with brief justification.
+  7. **Summary** — One-paragraph recap as if explaining to a friend.
 
 ### 6. Checklist
 
