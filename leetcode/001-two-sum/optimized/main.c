@@ -2,73 +2,23 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <stdint.h>
+#include "hashtable.h"
 
 #define ARRAYSIZE(a) (sizeof (a) / sizeof *(a))
 
 /*
  * Hash table approach - O(n) time, O(n) space.
  *
- * For each number, compute complement = target - nums[i],
- * then look up the complement in the hash table.
- * If found, return the pair. Otherwise, insert nums[i].
+ * Uses libhashtable (mylib/hashtable) for the hash table.
+ * Since the library uses string keys, we convert integer keys
+ * to strings via snprintf. Values are stored by casting the
+ * integer index to (void *)(intptr_t) to avoid heap allocation.
  */
 
-#define HT_SIZE 4096
-
-struct ht_entry {
-	int key;	/* the number value */
-	int val;	/* the index in nums */
-	int used;
-};
-
-static void ht_init(struct ht_entry *ht)
+static void int_to_key(int num, char *buf, size_t bufsize)
 {
-	memset(ht, 0, HT_SIZE * sizeof(*ht));
-}
-
-static unsigned int ht_hash(int key)
-{
-	unsigned int k = (unsigned int)key;
-
-	k = ((k >> 16) ^ k) * 0x45d9f3b;
-	k = ((k >> 16) ^ k) * 0x45d9f3b;
-	k = (k >> 16) ^ k;
-	return k % HT_SIZE;
-}
-
-static int ht_get(struct ht_entry *ht, int key, int *val)
-{
-	unsigned int h = ht_hash(key);
-	unsigned int i;
-
-	for (i = 0; i < HT_SIZE; i++) {
-		unsigned int idx = (h + i) % HT_SIZE;
-
-		if (!ht[idx].used)
-			return 0;
-		if (ht[idx].key == key) {
-			*val = ht[idx].val;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-static void ht_put(struct ht_entry *ht, int key, int val)
-{
-	unsigned int h = ht_hash(key);
-	unsigned int i;
-
-	for (i = 0; i < HT_SIZE; i++) {
-		unsigned int idx = (h + i) % HT_SIZE;
-
-		if (!ht[idx].used) {
-			ht[idx].key = key;
-			ht[idx].val = val;
-			ht[idx].used = 1;
-			return;
-		}
-	}
+	snprintf(buf, bufsize, "%d", num);
 }
 
 /**
@@ -77,30 +27,37 @@ static void ht_put(struct ht_entry *ht, int key, int val)
 int *twoSum(int *nums, int numsSize, int target, int *returnSize)
 {
 	int *returned;
-	struct ht_entry *ht;
-	int i, complement, idx;
+	hashtable_t *ht;
+	int i, complement;
+	char key_buf[32];
+	void *val;
 
 	*returnSize = 2;
 	returned = (int *)malloc((*returnSize) * sizeof(*returned));
 	assert(returned);
 	memset(returned, 0x0, (*returnSize) * sizeof(*returned));
 
-	ht = (struct ht_entry *)malloc(HT_SIZE * sizeof(*ht));
+	ht = ht_create(0);
 	assert(ht);
-	ht_init(ht);
 
 	for (i = 0; i < numsSize; i++) {
 		complement = target - nums[i];
-		if (ht_get(ht, complement, &idx)) {
-			returned[0] = idx;
+		int_to_key(complement, key_buf, sizeof(key_buf));
+
+		val = ht_get(ht, key_buf);
+		if (val) {
+			returned[0] = (int)(intptr_t)val - 1;
 			returned[1] = i;
-			free(ht);
+			ht_destroy(ht);
 			return returned;
 		}
-		ht_put(ht, nums[i], i);
+
+		int_to_key(nums[i], key_buf, sizeof(key_buf));
+		/* Store index + 1 so that index 0 is distinguishable from NULL */
+		ht_set(ht, key_buf, (void *)(intptr_t)(i + 1));
 	}
 
-	free(ht);
+	ht_destroy(ht);
 	return returned;
 }
 
