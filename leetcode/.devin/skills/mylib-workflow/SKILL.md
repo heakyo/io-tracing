@@ -54,7 +54,7 @@ Both files must include:
 - **Build Instructions** — How to compile the library and the demo.
 - **Usage Example** — Code snippet showing typical usage.
 
-Additionally, `readme.md` must include a **Function Usage Q&A** section with one subsection per public function. Each subsection uses a Q&A format:
+Additionally, both `readme.md` and `readme_cn.md` must include a **Function Usage Q&A** section with one subsection per function (including internal `static` functions like `ht_hash`). Each subsection uses a Q&A format:
 
 - **Q: What does this function do?** — Plain-language description.
 - **Q: What are the parameters?** — Explain each parameter.
@@ -75,5 +75,5 @@ Before finishing any mylib task, verify:
 
 - [ ] Library compiles to a `.so` file successfully.
 - [ ] `demo/main.c` builds, runs, and demonstrates all major API functions.
-- [ ] `readme.md` (English) and `readme_cn.md` (中文) both exist with API reference and Q&A function usage guide.
+- [ ] `readme.md` (English) and `readme_cn.md` (中文) both exist with API reference and Q&A function usage guide (both files include Q&A).
 - [ ] `git commit -s` has been executed for all changes.
