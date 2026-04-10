@@ -5,31 +5,34 @@
 
 #define ARRAYSIZE(a) (sizeof (a) / sizeof *(a))
 
-int quick_sort(int *array, int low, int high)
+void merge(int* nums1, int nums1Size, int m, int* nums2, int nums2Size, int n)
 {
-	return 0;
+
+}
+
+void show_array(char *type, int *a, int len)
+{
+	printf("%s: [", type);
+	for (int i = 0; i < len - 1; i++)
+		printf("%d ", a[i]);
+	printf("%d]\n", a[len - 1]);
 }
 
 int main(int argc, char *argv[])
 {
-	int array[5] = {1, 7, 3, 8, 4};
-	int array_len = ARRAYSIZE(array);
+	int nums1[6] = {1, 2, 3, 0, 0, 0};
+	int nums2[3] = {2, 5, 6};
+	int m = 3, n = 3;
 	int i;
 
 	/* Input */
-	printf("Input: [");
-	for (i = 0; i < array_len - 1; i++)
-		printf("%d ", array[i]);
-	printf("%d]\n", array[i]);
+	show_array("Input", nums1, ARRAYSIZE(nums1));
+	show_array("Input", nums2, ARRAYSIZE(nums2));
 
 	/* Algorithm */
-	quick_sort(array, 0, array_len - 1);
 
 	/* Output */
-	printf("Output: [");
-	for (i = 0; i < array_len - 1; i++)
-		printf("%d ", array[i]);
-	printf("%d]\n", array[i]);
+	show_array("Output", nums1, ARRAYSIZE(nums1));
 
 	return 0;
 }
