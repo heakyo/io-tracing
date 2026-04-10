@@ -5,6 +5,15 @@
 
 #define ARRAYSIZE(a) (sizeof (a) / sizeof *(a))
 
+void swap(int *a, int *b)
+{
+	int tmp;
+
+	tmp = *a;
+	*a = *b;
+	*b = tmp;
+}
+
 void merge(int* nums1, int nums1Size, int m, int* nums2, int nums2Size, int n)
 {
 
@@ -23,7 +32,6 @@ int main(int argc, char *argv[])
 	int nums1[6] = {1, 2, 3, 0, 0, 0};
 	int nums2[3] = {2, 5, 6};
 	int m = 3, n = 3;
-	int i;
 
 	/* Input */
 	show_array("Input", nums1, ARRAYSIZE(nums1));
