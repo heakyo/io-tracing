@@ -28,21 +28,17 @@ void quick_sort(int *array, int low, int high)
 
 	while (i < j) {
 
-		while (i < pivot && array[i] <= array[pivot]) i++;
-		if (i < pivot) {
-			swap(&array[i], &array[pivot]);
-			pivot = i;
-		}
+		while (i < j && array[i] <= array[pivot]) i++;
+		while (i < j && array[pivot] <= array[j]) j--;
 
-		while (pivot < j && array[pivot] <= array[j]) j--;
-		if (pivot < j) {
-			swap(&array[pivot], &array[j]);
-			pivot = j;
-		}
+		if (i < j)
+			swap(&array[i], &array[j]);
 	}
 
-	quick_sort(array, 0, pivot - 1);
-	quick_sort(array, pivot + 1, high);
+	swap(&array[j], &array[pivot]);
+
+	quick_sort(array, low, j - 1);
+	quick_sort(array, j + 1, high);
 }
 
 static void print_array(const char *label, int *array, int len)
