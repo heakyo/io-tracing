@@ -5,33 +5,28 @@
 
 #define ARRAYSIZE(a) (sizeof (a) / sizeof *(a))
 
-void swap(int *a, int *b)
+/*
+ * Optimized Merge Sorted Array — O(m+n) time, O(1) space.
+ *
+ * Same backward-merge algorithm as the original, but uses index-based
+ * access instead of pointer arithmetic for clarity.  The unused swap()
+ * function is removed.
+ */
+void merge(int *nums1, int nums1Size, int m, int *nums2, int nums2Size, int n)
 {
-        int tmp;
+	int i = m - 1;
+	int j = n - 1;
+	int k = m + n - 1;
 
-        tmp = *a;
-        *a = *b;
-        *b = tmp;
-}
-
-void merge(int* nums1, int nums1Size, int m, int* nums2, int nums2Size, int n)
-{
-	int *p1, *p2, *p;
-
-	p1 = nums1 + m - 1;
-	p2 = nums2 + n - 1;
-	p = nums1 + m + n - 1;
-
-	while (nums1 <= p1 && nums2 <= p2) {
-		if (*p2 > *p1) {
-			*p-- = *p2--;
-		} else {
-			*p-- = *p1--;
-		}
+	while (i >= 0 && j >= 0) {
+		if (nums2[j] > nums1[i])
+			nums1[k--] = nums2[j--];
+		else
+			nums1[k--] = nums1[i--];
 	}
 
-	while (nums2 <= p2)
-		*p-- = *p2--;
+	while (j >= 0)
+		nums1[k--] = nums2[j--];
 }
 
 static void print_array(const char *label, int *array, int len)
