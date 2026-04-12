@@ -3,49 +3,40 @@
 #include <stdlib.h>
 #include <assert.h>
 
-struct mark {
-	int cnt;
-	int offset;
-};
-
-int lengthOfLongestSubstring(char* s)
+/*
+ * Optimized sliding window with last-seen position array.
+ *
+ * Single pass: for each character, if it was seen at or after 'left',
+ * move 'left' past its last occurrence. Update the character's last
+ * position and track the maximum window size.
+ *
+ * Time:  O(n) — one pass, no memset per window position.
+ * Space: O(1) — fixed 256-entry array.
+ */
+int lengthOfLongestSubstring(char *s)
 {
-	struct mark m[256];
-	int max;
-	char *p1, *p2;	
+	int last[256];
+	int left, right, max_len, len;
 
-	max = 0;
-	p1 = s;
-	p2 = p1;
+	memset(last, 0xff, sizeof(last)); /* -1 for all entries */
 
-	while(*p1) {
-		memset(m, 0x0, sizeof(struct mark)*256);
-		p2 = p1;
-		while (*p2) {
+	left = 0;
+	max_len = 0;
+	len = strlen(s);
 
-			if (m[*p2].cnt > 0) {
-				m[*p2].cnt = 0;
-				if (p2 - p1 > max)
-					max = p2 - p1;
-				break;
-			}
+	for (right = 0; right < len; right++) {
+		unsigned char ch = s[right];
 
-			m[*p2].cnt++;
-			m[*p2].offset = p2 - p1;
+		if (last[ch] >= left)
+			left = last[ch] + 1;
 
-			p2++;
-		}
+		last[ch] = right;
 
-		if (*p2 == '\0' && p2 - p1 > max) {
-			max = p2 - p1;
-			break;
-		}
-
-		p1 += m[*p2].offset + 1;
-		m[*p2].offset = 0;
+		if (right - left + 1 > max_len)
+			max_len = right - left + 1;
 	}
 
-	return max;
+	return max_len;
 }
 
 static void run_test(const char *name, char *s, int expected)
