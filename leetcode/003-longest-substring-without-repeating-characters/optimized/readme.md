@@ -20,7 +20,7 @@ The original solution is correct and has O(n) amortized time, but it carries unn
 
 1. **Memset per window start.** Every time `p1` advances, the original resets all 256 entries of the `struct mark` array (2048 bytes). This constant factor adds up.
 2. **Nested loop structure.** The original has an outer `while(*p1)` and inner `while(*p2)`, which obscures the single-pass nature of the algorithm.
-3. **Unused struct field.** The `cnt` field only ever holds 0 or 1 — a boolean check masquerading as a counter.
+3. **Two-field struct.** Each entry stores both `seen` (a boolean) and `len` (an offset). The optimized version only needs one int per character.
 
 The optimized version replaces all of this with a single `for` loop over the string and a `last[256]` array storing the most recent index of each character. One `memset` at the start, zero inside the loop.
 
@@ -177,7 +177,7 @@ Result: 3
 
 3. **`unsigned char ch` avoids negative indexing.** If `char` is signed, characters with values 128-255 would produce negative array indices. Casting to `unsigned char` ensures valid 0-255 indexing. The original code doesn't do this (it uses `*p2` directly), which would be undefined behavior for extended ASCII.
 
-4. **No special case for end-of-string.** The original needs a separate `*p2 == '\0'` check after the inner loop. With a single `for` loop bounded by `len`, the empty-string case (len=0, loop body never executes, returns 0) and end-of-string are handled naturally.
+4. **No special case for end-of-string.** The original's inner loop runs `while (*p2)`, so when `p2` reaches `'\0'` the outer loop continues with extra iterations until `*p1 == '\0'`. With a single `for` loop bounded by `len`, the empty-string case (len=0, loop body never executes, returns 0) and end-of-string are handled naturally with no wasted iterations.
 
 ---
 
@@ -200,7 +200,7 @@ Result: 3
 | **Memset calls** | One per window start position | One total (at initialization) |
 | **Loop structure** | Nested `while`/`while` | Single `for` loop |
 | **Signed char safety** | No (`*p2` used as index directly) | Yes (`unsigned char` cast) |
-| **Lines of code** | 39 (function body) | 16 (function body) |
+| **Lines of code** | 23 (function body) | 16 (function body) |
 
 The optimized version is simpler, has lower constant overhead (no per-position memset), uses half the memory for the lookup table, and handles extended ASCII safely.
 
