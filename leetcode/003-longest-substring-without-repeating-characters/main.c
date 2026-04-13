@@ -4,45 +4,37 @@
 #include <assert.h>
 
 struct mark {
-	int cnt;
-	int offset;
+	int seen;
+	int len;
 };
 
 int lengthOfLongestSubstring(char* s)
 {
 	struct mark m[256];
-	int max;
 	char *p1, *p2;	
+	int max;
 
 	max = 0;
 	p1 = s;
-	p2 = p1;
 
 	while(*p1) {
-		memset(m, 0x0, sizeof(struct mark)*256);
+		memset(m, 0x0, sizeof(m));
 		p2 = p1;
 		while (*p2) {
 
-			if (m[*p2].cnt > 0) {
-				m[*p2].cnt = 0;
-				if (p2 - p1 > max)
-					max = p2 - p1;
+			if (m[*p2].seen)
 				break;
-			}
 
-			m[*p2].cnt++;
-			m[*p2].offset = p2 - p1;
+			m[*p2].seen = 1;
+			m[*p2].len = p2 - p1;
 
 			p2++;
 		}
 
-		if (*p2 == '\0' && p2 - p1 > max) {
+		if (p2 - p1 > max)
 			max = p2 - p1;
-			break;
-		}
 
-		p1 += m[*p2].offset + 1;
-		m[*p2].offset = 0;
+		p1 += m[*p2].len + 1;
 	}
 
 	return max;
