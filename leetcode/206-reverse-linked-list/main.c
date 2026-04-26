@@ -49,16 +49,15 @@ void show_list(char *type, struct ListNode* head)
  */
 struct ListNode* reverseList(struct ListNode* head)
 {
-	struct ListNode *rh = NULL, *p = head;
+	struct ListNode *rh = NULL, *p;
 
-	while (p) {
+	while (head) {
 
+		p = head;
 		head = head->next;
 
 		p->next = rh;
 		rh = p;
-
-		p = head;
 	}
 
 	return rh;
