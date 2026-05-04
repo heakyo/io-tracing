@@ -19,47 +19,37 @@ struct ListNode {
  */
 struct ListNode* reverseKGroup(struct ListNode* head, int k)
 {
-	struct ListNode *cur, *pre, *tmp, *dummy;
+	struct ListNode dummy = { .val = 0, .next = head };
+	struct ListNode *prev, *tail, *move, *cur;
 	int size, i;
 
-	dummy = (struct ListNode *)malloc(sizeof(*dummy));
-	dummy->next = head;
-	pre = dummy;
-
+	/* count total nodes */
 	size = 0;
-	cur = head;
-	while (cur) {
+	for (cur = head; cur; cur = cur->next)
 		size++;
-		cur = cur->next;
-	}
 
-	cur = head;
+	prev = &dummy;
+	tail = head;
+
 	while (size >= k) {
-		/* the following three methods all works */
+		/*
+		 * Head-insertion: repeatedly take the node after tail
+		 * and insert it right after prev. After k-1 iterations
+		 * the k-node group is reversed.
+		 */
 		for (i = 0; i < k - 1; i++) {
-			//tmp = pre->next;
-			//pre->next = cur->next;
-			//cur->next = cur->next->next;
-			//pre->next->next = tmp;
-
-			tmp = cur->next;
-			cur->next = tmp->next;
-			tmp->next = pre->next;
-			pre->next = tmp;
-
-			//tmp = cur->next->next;
-			//cur->next->next = pre->next;
-			//pre->next = cur->next;
-			//cur->next = tmp;
-
+			move = tail->next;
+			tail->next = move->next;
+			move->next = prev->next;
+			prev->next = move;
 		}
 
 		size -= k;
-		pre = cur;
-		cur = cur->next;
+		prev = tail;
+		tail = tail->next;
 	}
 
-	return dummy->next;
+	return dummy.next;
 }
 
 struct ListNode *insert_list(int *nums, int size)
