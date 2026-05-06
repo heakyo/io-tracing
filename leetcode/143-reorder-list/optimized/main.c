@@ -49,41 +49,41 @@ void show_list(char *type, struct ListNode* head)
  */
 void reorderList(struct ListNode* head)
 {
-	struct ListNode *revert_head, *cur, *pre, *tmp, *tmp2;
-	int size, revert_size, i;
+	struct ListNode *slow, *fast, *prev, *curr, *next;
+	struct ListNode *first, *second, *tmp;
 
-	if (head == NULL)
+	if (head == NULL || head->next == NULL)
 		return;
 
-	size = 0;
-	for (cur = head; cur; cur = cur->next)
-		size++;
-
-	revert_size = size >> 1;
-	cur = head;
-	for (i = 0; i < size - revert_size; i++) {
-		pre = cur;
-		cur = cur->next;
-	}
-	pre->next = NULL;
-
-	revert_head = NULL;
-	while (cur) {
-		tmp  = cur->next;
-		cur->next = revert_head;
-		revert_head = cur;
-		cur = tmp;
+	/* Step 1: find the middle using slow/fast pointers */
+	slow = head;
+	fast = head;
+	while (fast->next && fast->next->next) {
+		slow = slow->next;
+		fast = fast->next->next;
 	}
 
-	cur = head;
-	while (cur && revert_head) {
-		tmp = cur;
-		tmp2 = revert_head;
-		cur = cur->next;
-		revert_head = revert_head->next;
+	/* Step 2: reverse the second half */
+	prev = NULL;
+	curr = slow->next;
+	slow->next = NULL;
 
-		tmp->next = tmp2;
-		tmp2->next = cur;
+	while (curr) {
+		next = curr->next;
+		curr->next = prev;
+		prev = curr;
+		curr = next;
+	}
+
+	/* Step 3: merge the two halves */
+	first = head;
+	second = prev;
+	while (second) {
+		tmp = first->next;
+		first->next = second;
+		second = second->next;
+		first->next->next = tmp;
+		first = tmp;
 	}
 }
 
@@ -213,4 +213,3 @@ int main(int argc, char *argv[])
 	printf("All tests passed!\n");
 	return 0;
 }
-
