@@ -1,0 +1,24 @@
+# ============== Create /dev/md0 ==============
+# Create a 100M file
+truncate -s 100M ufs.img
+dd if=/dev/zero of=ufs.img bs=1M count=100
+
+# Check existing devices
+mdconfig -l
+---------------------------------------
+
+# Attach the file as an md device
+mdconfig -a -t vnode -f ufs.img
+---------------------------------------
+md0
+
+# Create a UFS filesystem (UFS2 by default
+newfs -U /dev/md0
+
+# Mount the new UFS filesystem
+mkdir /mnt/ufsimg
+mount /dev/md0 ufsimg
+
+# Unmount and detach when done
+umount ufsimg
+mdconfig -d -u 0
