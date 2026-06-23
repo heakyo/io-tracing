@@ -1,8 +1,8 @@
-#! /bin/bash
+#! /usr/local/bin/bash
 
 set -e
 
-DEV=/dev/ada0p20
+DEV=/dev/md0
 MNT=ufs2demo_mntdir
 FILE=$MNT/myfirstfile
 MP=$(mount | awk -v dev="$DEV" '$1 == dev {print $3}')
