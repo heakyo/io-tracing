@@ -17,6 +17,8 @@ typedef struct hash_table {
 	size_t capacity;
 } HashTable;
 
+size_t hash_index(int key, size_t capacity);
+
 /*
  * Create a hash table.
  *
