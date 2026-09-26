@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "hashtable.h"
+#include "../include/hashtable.h"
 
 HashTable *hash_create(size_t capacity)
 {
@@ -24,4 +24,9 @@ HashTable *hash_create(size_t capacity)
 	ht->size = 0;
 
 	return ht;
+}
+
+int hash_insert(HashTable *ht, int key, int value)
+{
+	return 0;
 }
