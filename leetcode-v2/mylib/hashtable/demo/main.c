@@ -8,12 +8,16 @@
 /* Function declaration */
 static void test_hash_create(void);
 static void test_hash_insert(void);
+static void test_hash_find(void);
+static void test_hash_destroy(void);
 
 int
 main(void)
 {
     //test_hash_create();
-    test_hash_insert();
+    //test_hash_insert();
+    //test_hash_find();
+    test_hash_destroy();
 
     return (0);
 }
@@ -239,4 +243,209 @@ test_hash_insert(void)
         free(ht);
 
         printf("test_hash_insert PASSED\n");
+}
+
+static void
+test_hash_find(void)
+{
+        HashTable *ht;
+        int value;
+        int ret;
+
+        printf("Running test_hash_find...\n");
+
+        ht = hash_create(8);
+        assert(ht != NULL);
+
+        /*
+         * Insert test entries.
+         *
+         * Keys 2, 10, and -10 map to the same bucket when
+         * the hash table capacity is 8.
+         */
+        assert(hash_insert(ht, 2, 100) == 0);
+        assert(hash_insert(ht, 3, 200) == 0);
+        assert(hash_insert(ht, 10, 300) == 0);
+        assert(hash_insert(ht, -10, 400) == 0);
+        assert(hash_insert(ht, INT_MIN, 500) == 0);
+
+        assert(ht->size == 5);
+
+        /*
+         * Test 1: Find an entry in a bucket without collision.
+         */
+        value = 0;
+        ret = hash_find(ht, 3, &value);
+
+        assert(ret == 1);
+        assert(value == 200);
+
+        /*
+         * Test 2: Find the first entry in a collision chain.
+         */
+        value = 0;
+        ret = hash_find(ht, 2, &value);
+
+        assert(ret == 1);
+        assert(value == 100);
+
+        /*
+         * Test 3: Find another entry in the same collision chain.
+         */
+        value = 0;
+        ret = hash_find(ht, 10, &value);
+
+        assert(ret == 1);
+        assert(value == 300);
+
+        /*
+         * Test 4: Find a negative key.
+         */
+        value = 0;
+        ret = hash_find(ht, -10, &value);
+
+        assert(ret == 1);
+        assert(value == 400);
+
+        /*
+         * Test 5: Find INT_MIN.
+         */
+        value = 0;
+        ret = hash_find(ht, INT_MIN, &value);
+
+        assert(ret == 1);
+        assert(value == 500);
+
+        /*
+         * Test 6: Search for a key that does not exist.
+         *
+         * The output value should not be modified when the
+         * requested key is not found.
+         */
+        value = 12345;
+        ret = hash_find(ht, 999, &value);
+
+        assert(ret == 0);
+        assert(value == 12345);
+
+        /*
+         * Test 7: Update an existing key and verify that
+         * hash_find() returns the new value.
+         */
+        assert(hash_insert(ht, 10, 600) == 0);
+        assert(ht->size == 5);
+
+        value = 0;
+        ret = hash_find(ht, 10, &value);
+
+        assert(ret == 1);
+        assert(value == 600);
+
+        /*
+         * Test 8: A NULL output pointer should be allowed when
+         * the caller only wants to check whether the key exists.
+         */
+        ret = hash_find(ht, 10, NULL);
+        assert(ret == 1);
+
+        /*
+         * Test 9: Searching for a missing key with a NULL output
+         * pointer should still return zero.
+         */
+        ret = hash_find(ht, 999, NULL);
+        assert(ret == 0);
+
+        /*
+         * Release all entries manually until hash_destroy()
+         * is implemented.
+         */
+        for (size_t i = 0; i < ht->capacity; i++) {
+                HashEntry *entry;
+
+                entry = ht->buckets[i];
+
+                while (entry != NULL) {
+                        HashEntry *next;
+
+                        next = entry->next;
+                        free(entry);
+                        entry = next;
+                }
+        }
+
+        free(ht->buckets);
+        free(ht);
+
+        printf("test_hash_find PASSED\n");
+}
+
+static void
+test_hash_destroy(void)
+{
+        HashTable *ht;
+
+        printf("Running test_hash_destroy...\n");
+
+        /*
+         * Test 1: Destroy an empty hash table.
+         */
+        ht = hash_create(8);
+        assert(ht != NULL);
+        assert(ht->size == 0);
+
+        hash_destroy(ht);
+
+        /*
+         * Test 2: Destroy a hash table containing entries
+         * in different buckets.
+         */
+        ht = hash_create(8);
+        assert(ht != NULL);
+
+        assert(hash_insert(ht, 2, 100) == 0);
+        assert(hash_insert(ht, 3, 200) == 0);
+        assert(hash_insert(ht, 4, 300) == 0);
+
+        assert(ht->size == 3);
+
+        hash_destroy(ht);
+
+        /*
+         * Test 3: Destroy a hash table containing a collision
+         * chain.
+         *
+         * With a capacity of 8, keys 2, 10, 18, and -10
+         * map to the same bucket with the current hash function.
+         */
+        ht = hash_create(8);
+        assert(ht != NULL);
+
+        assert(hash_insert(ht, 2, 100) == 0);
+        assert(hash_insert(ht, 10, 200) == 0);
+        assert(hash_insert(ht, 18, 300) == 0);
+        assert(hash_insert(ht, -10, 400) == 0);
+
+        assert(ht->size == 4);
+
+        hash_destroy(ht);
+
+        /*
+         * Test 4: Destroy a hash table containing INT_MIN.
+         */
+        ht = hash_create(8);
+        assert(ht != NULL);
+
+        assert(hash_insert(ht, INT_MIN, 500) == 0);
+        assert(hash_insert(ht, 1, 600) == 0);
+
+        assert(ht->size == 2);
+
+        hash_destroy(ht);
+
+        /*
+         * Test 5: Destroying a NULL hash table should be safe.
+         */
+        hash_destroy(NULL);
+
+        printf("test_hash_destroy PASSED\n");
 }

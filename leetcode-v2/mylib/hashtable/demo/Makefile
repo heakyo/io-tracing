@@ -4,7 +4,9 @@
 
 CC      = gcc
 CFLAGS  = -O0 -g -Wall -I../include
+CFLAGS  += -fsanitize=address,undefined
 LDFLAGS = -L.. -lhashtable -Wl,-rpath,$(shell cd .. && pwd)
+LDFLAGS += -fsanitize=address,undefined
 TARGET  = main
 
 SRCS    = main.c
