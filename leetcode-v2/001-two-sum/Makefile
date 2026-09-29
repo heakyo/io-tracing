@@ -4,7 +4,10 @@
 
 # 1. Compiler and Flags
 CC      = gcc
-CFLAGS  = -O0 -g
+CFLAGS  = -O0 -g -Wall -I../mylib/hashtable/include
+CFLAGS  += -fsanitize=address,undefined
+LDFLAGS = -L../mylib/hashtable -lhashtable -Wl,-rpath,$(shell cd ../mylib/hashtable && pwd)
+LDFLAGS += -fsanitize=address,undefined
 TARGET  = main
 
 # 2. Source and Object Files
@@ -19,7 +22,7 @@ all: $(TARGET)
 # 4. Linking Stage
 # Link object files to create the final executable
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # 5. Compilation Stage
 # Compile each .c file into a .o object file
