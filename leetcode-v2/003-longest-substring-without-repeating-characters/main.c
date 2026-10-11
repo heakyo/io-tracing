@@ -4,52 +4,138 @@
 #include <stdbool.h>
 #include <assert.h>
 
-struct mark {
-	int seen;
-	int len;
-};
-
 /* brute force */
-int lengthOfLongestSubstring(char* s)
+int lengthOfLongestSubstring_brute_force(char* s)
 {
 	int max;
-	bool found;
-	size_t slen;
-	char *anchor, *ap, *q, *qp;
+	char *anchor, *ap;
+	bool record[256];
+	unsigned char idx;
 
 	anchor = s;
-
-	slen = strlen(s);
-	q = calloc(slen + 1, sizeof(*q));
-
 	max =  0;
 
 	while (*anchor) {
 
-		found = false;
-		memset(q, 0x0, slen);
-		*q = *anchor;
+		memset(record, false, sizeof(record));
 
-		for (ap = anchor + 1; *ap; ap++) {
-			qp = q;
-			for (; *qp; qp++) {
-				if (*ap == *qp) {
-					found = true;
-					break;
-				}
-			}
-
-			if (found)
+		for (ap = anchor; *ap; ap++) {
+			idx = *ap;
+			if (record[idx])
 				break;
 
-			*qp = *ap;
+			record[idx] = true;
 		}
 
-		if ((*ap == 0 || found) && strlen(q) > max)
-			max = strlen(q);
+		if (((ap - anchor) > max))
+			max = ap - anchor;
 
 		anchor++;
 	}
+
+	return max;
+}
+
+#define INVAL -1
+
+/* sliding window V1 */
+int lengthOfLongestSubstring_V1(char* s)
+{
+	int max;
+	char *left, *right;
+	int record[256];
+	unsigned char idx;
+
+	left = s;
+	right = left;
+	max =  0;
+
+	memset(record, INVAL, sizeof(record));
+
+	while (*right && *left) {
+
+		for (; *right; right++) {
+			idx = *right;
+			if (record[idx] != INVAL && (record[idx] >= (left - s)))
+				break;
+
+			record[idx] = right - s;
+		}
+
+		if ((right - left) > max)
+			max = right - left;
+
+		left += (record[idx] - (left - s)) + 1;
+	}
+
+	return max;
+}
+
+/* sliding window V2*/
+int lengthOfLongestSubstringV2(char* s)
+{
+	char *left, *right;
+	int max, record[256];
+	unsigned char idx;
+
+	left = right = s;
+	max =  0;
+
+	memset(record, INVAL, sizeof(record));
+
+	while (*right) {
+
+		idx = *right;
+		if (record[idx] != INVAL && record[idx] >= (left - s)) {
+
+			if (right - left > max)
+				max = right - left;
+
+			left = s + record[idx] + 1;
+		}
+
+		record[idx] = right - s;
+
+		right++;
+	}
+
+	if (right - left > max)
+		max = right - left;
+
+	return max;
+}
+
+/* sliding window V3*/
+int lengthOfLongestSubstring(char* s)
+{
+	char *left, *right;
+	int max, record[256];
+	unsigned char idx;
+
+	left = right = s;
+	max =  0;
+
+	memset(record, INVAL, sizeof(record));
+
+	while (*right) {
+
+		idx = *right;
+		if (record[idx] != INVAL && record[idx] >= (left - s))
+			left = s + record[idx] + 1;
+
+		record[idx] = right - s;
+
+		/*
+		 * Loop Invariant:
+		 * 	A condition that must hold whenever we reach this point in the loop.
+		 * 	Whenever execution reaches the point to compute `max`, the range [left, right] contains no duplicate characters.
+		 */
+		if (right - left + 1 > max)
+			max = right - left + 1;
+
+		right++;
+	}
+
 
 	return max;
 }
@@ -102,6 +188,12 @@ int main(int argc, char *argv[])
 
 	/* Test 10: Duplicate at start */
 	run_test("Duplicate at start", "aab", 2);
+
+	/* Test 11: LeetCode example */
+	run_test("Duplicate at start", "cdcda", 3);
+
+	/* Test 12: LeetCode example */
+	run_test("Duplicate at start", "abcdc", 4);
 
 	printf("All tests passed!\n");
 #endif
