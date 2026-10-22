@@ -7,9 +7,95 @@
 char ***groupAnagrams(char **strs, int strsSize,
     int *returnSize, int **returnColumnSizes);
 
+static bool
+test_are_anagrams(const char *a, const char *b);
+
+/* Brute Force + Visited */
 char ***groupAnagrams(char **strs, int strsSize,
     int *returnSize, int **returnColumnSizes)
 {
+	int i, j, k, h;
+	char ***grpAnagrams;
+	int *columnSizes;
+	int *visited;
+	char **tmp;
+
+	grpAnagrams = NULL;
+	columnSizes = NULL;
+	visited = NULL;
+	k = 0;
+
+	if (strsSize == 0)
+		goto exit;
+
+	grpAnagrams = calloc(strsSize, sizeof(char **));
+	if (!grpAnagrams)
+		goto exit;
+
+	columnSizes = calloc(strsSize, sizeof(int));
+	if (!columnSizes)
+		goto alloc_columnSizes_failed;
+
+	visited = calloc(strsSize, sizeof(int));
+	if (!visited)
+		goto alloc_visited_failed;
+
+	for (i = 0; i < strsSize; i++) {
+
+		if (visited[i])
+			continue;
+
+		h = 0;
+		grpAnagrams[k] = calloc(strsSize, sizeof(char *));
+		if (!grpAnagrams[k])
+			goto alloc_grpAnagramsK_failed;
+
+		grpAnagrams[k][h++] = strs[i];
+
+		visited[i] = 1;
+
+		for (j = i + 1; j < strsSize; j++) {
+
+			if (visited[j])
+				continue;
+
+			if (test_are_anagrams(strs[i], strs[j])) {
+				grpAnagrams[k][h++] = strs[j];
+				visited[j] = 1;
+			}
+		}
+
+		columnSizes[k] = h;
+
+		tmp = realloc(grpAnagrams[k], h * sizeof(char *));
+		if (tmp)
+			grpAnagrams[k] = tmp;
+
+		k++;
+	}
+
+	free(visited);
+
+	*returnColumnSizes = columnSizes;
+	*returnSize = k;
+
+	return grpAnagrams;
+
+alloc_grpAnagramsK_failed:
+	for (i = k - 1; i >= 0; i--)
+		free(grpAnagrams[i]);
+	free(visited);
+
+alloc_visited_failed:
+	free(columnSizes);
+
+alloc_columnSizes_failed:
+	free(grpAnagrams);
+
+exit:
+	*returnSize = 0;
+	*returnColumnSizes = NULL;
+
 	return NULL;
 }
 
@@ -90,18 +176,15 @@ validate_group_anagrams(char **strs, int strsSize,
                         /*
                          * Find the original input pointer.
                          */
-                        found = -1;
+			for (k = 0; k < strsSize; k++) {
+				if (!seen[k] &&
+				strcmp(result[i][j], strs[k]) == 0) {
+					found = k;
+					break;
+				}
+			}
 
-                        for (k = 0; k < strsSize; k++) {
-                                if (result[i][j] == strs[k]) {
-                                        found = k;
-                                        break;
-                                }
-                        }
-
-                        assert(found >= 0);
-                        assert(!seen[found]);
-
+			assert(found >= 0);
                         seen[found] = true;
                         total++;
                 }
