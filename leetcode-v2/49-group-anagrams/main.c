@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <assert.h>
+#include "hashtable/include/hashtable.h"
 
 char ***groupAnagrams(char **strs, int strsSize,
     int *returnSize, int **returnColumnSizes);
@@ -11,7 +12,7 @@ static bool
 test_are_anagrams(const char *a, const char *b);
 
 /* Brute Force + Visited */
-char ***groupAnagrams(char **strs, int strsSize,
+char ***groupAnagrams_bruteForce_Visted(char **strs, int strsSize,
     int *returnSize, int **returnColumnSizes)
 {
 	int i, j, k, h;
@@ -68,8 +69,9 @@ char ***groupAnagrams(char **strs, int strsSize,
 		columnSizes[k] = h;
 
 		tmp = realloc(grpAnagrams[k], h * sizeof(char *));
-		if (tmp)
-			grpAnagrams[k] = tmp;
+		if (!tmp)
+			goto alloc_grpAnagramsK_failed;
+		grpAnagrams[k] = tmp;
 
 		k++;
 	}
@@ -97,6 +99,67 @@ exit:
 	*returnColumnSizes = NULL;
 
 	return NULL;
+}
+
+void getSignature(char *str, int *signature)
+{
+	char *p;
+	int index;
+
+	p = str;
+
+	while (*p) {
+		index = *p - 'a';
+		signature[index]++;
+		p++;
+	}
+}
+
+char ***groupAnagrams(char **strs, int strsSize, int *returnSize, int **returnColumnSizes)
+{
+	HashTable *ht;
+	char ***grpAnagrams;
+	int *columnSizes;
+	int signature[26];
+	int grpIndex, colmIndex, index;
+	int i;
+
+	grpIndex = 0;
+	index = 0;
+
+	grpAnagrams = calloc(200, sizeof(char **));
+	columnSizes = calloc(200, sizeof(int));
+
+	ht = hash_create(0);
+
+	for (i = 0; i < strsSize; i++) {
+
+		memset(signature, 0x0, sizeof(signature));
+		getSignature(strs[i], signature);
+
+		if (hash_find(ht, signature, &index)) {
+			colmIndex = columnSizes[index];
+			grpAnagrams[index][colmIndex] = strs[i];
+			columnSizes[index]++;
+
+			continue;
+		}
+
+		hash_insert(ht, signature, grpIndex);
+		grpAnagrams[grpIndex] = calloc(200, sizeof(char *));
+		colmIndex = columnSizes[grpIndex];
+		grpAnagrams[grpIndex][colmIndex] = strs[i];
+		columnSizes[grpIndex]++;
+
+		grpIndex++;
+	}
+
+	hash_destroy(ht);
+
+	*returnColumnSizes = columnSizes;
+	*returnSize = grpIndex;
+
+	return grpAnagrams;
 }
 
 /*
@@ -436,15 +499,18 @@ test_group_anagrams(void)
          * Test 15: Large number of unique strings.
          */
         {
-                char storage[100][16];
-                char *strs[100];
-                int i;
+		char storage[100][128];
+		char *strs[100];
+		int i, j;
 
-                for (i = 0; i < 100; i++) {
-                        snprintf(storage[i], sizeof(storage[i]),
-                            "item%d", i);
-                        strs[i] = storage[i];
-                }
+		for (i = 0; i < 100; i++) {
+
+			for (j = 0; j <= i; j++)
+				storage[i][j] = 'a';
+
+			storage[i][i + 1] = '\0';
+			strs[i] = storage[i];
+		}
 
                 /*
                  * The numeric suffixes create some

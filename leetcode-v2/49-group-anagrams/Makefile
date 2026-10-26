@@ -4,9 +4,9 @@
 
 # 1. Compiler and Flags
 CC      = gcc
-CFLAGS  = -O0 -g -Wall -I../mylib/hashtable/include
+CFLAGS  = -O0 -g -Wall -I./hashtable/include
 CFLAGS  += -fsanitize=address,undefined
-LDFLAGS = -L../mylib/hashtable -lhashtable -Wl,-rpath,$(shell cd ../mylib/hashtable && pwd)
+LDFLAGS = -L./hashtable -lhashtable -Wl,-rpath,$(shell cd ./hashtable && pwd)
 LDFLAGS += -fsanitize=address,undefined
 TARGET  = main
 
