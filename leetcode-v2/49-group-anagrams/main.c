@@ -119,16 +119,27 @@ char ***groupAnagrams(char **strs, int strsSize, int *returnSize, int **returnCo
 {
 	HashTable *ht;
 	char ***grpAnagrams;
+	char ***grpTmp;
+	int *columnTmp;
 	int *columnSizes;
 	int signature[26];
-	int grpIndex, colmIndex, index;
+	int grpIndex, colmIndex, index, grpSize, oldGrpSize;
 	int i;
+	char **grpColTmp;
 
 	grpIndex = 0;
 	index = 0;
+	grpSize = 1;
 
-	grpAnagrams = calloc(200, sizeof(char **));
-	columnSizes = calloc(200, sizeof(int));
+	if (strsSize == 0) {
+		*returnColumnSizes = NULL;
+		*returnSize = 0;
+
+		return NULL;
+	}
+
+	grpAnagrams = calloc(grpSize, sizeof(char **));
+	columnSizes = calloc(grpSize, sizeof(int));
 
 	ht = hash_create(0);
 
@@ -139,6 +150,11 @@ char ***groupAnagrams(char **strs, int strsSize, int *returnSize, int **returnCo
 
 		if (hash_find(ht, signature, &index)) {
 			colmIndex = columnSizes[index];
+			if (colmIndex >= columnSizes[index]) {
+				grpColTmp = realloc(grpAnagrams[index], (columnSizes[index]<<1) * sizeof(char *));
+				grpAnagrams[index] = grpColTmp;
+				memset(grpAnagrams[index] + columnSizes[index], 0x0, columnSizes[index] * sizeof(char *));
+			}
 			grpAnagrams[index][colmIndex] = strs[i];
 			columnSizes[index]++;
 
@@ -146,10 +162,24 @@ char ***groupAnagrams(char **strs, int strsSize, int *returnSize, int **returnCo
 		}
 
 		hash_insert(ht, signature, grpIndex);
-		grpAnagrams[grpIndex] = calloc(200, sizeof(char *));
-		colmIndex = columnSizes[grpIndex];
-		grpAnagrams[grpIndex][colmIndex] = strs[i];
+
+		if (grpIndex >= grpSize) {
+			oldGrpSize = grpSize;
+			grpSize <<= 1;
+
+			grpTmp = realloc(grpAnagrams, grpSize * sizeof(char **));
+			grpAnagrams = grpTmp;
+			memset(grpAnagrams + oldGrpSize, 0x0, (grpSize - oldGrpSize) * sizeof(char **));
+
+			columnTmp = realloc(columnSizes, grpSize * sizeof(int));
+			columnSizes = columnTmp;
+			memset(columnSizes + oldGrpSize, 0x0, (grpSize - oldGrpSize) * sizeof(int));
+		}
+
 		columnSizes[grpIndex]++;
+		grpAnagrams[grpIndex] = calloc(columnSizes[grpIndex], sizeof(char *));
+		//grpAnagrams[grpIndex] = calloc(256, sizeof(char *));
+		grpAnagrams[grpIndex][0] = strs[i];
 
 		grpIndex++;
 	}
@@ -323,6 +353,20 @@ run_group_anagrams_test(const char *name,
 static void
 test_group_anagrams(void)
 {
+#if 0
+        /*
+         * Test 0: Standard LeetCode example.
+         */
+        {
+                char *strs[] = {
+                        "ate", "tea"
+                };
+
+                run_group_anagrams_test("Test 0",
+                    strs, 2, 1);
+        }
+#endif
+#if 1
         /*
          * Test 1: Standard LeetCode example.
          */
@@ -546,7 +590,7 @@ test_group_anagrams(void)
                 run_group_anagrams_test("Test 16",
                     NULL, 0, 0);
         }
-
+#endif
         printf("All groupAnagrams tests PASSED\n");
 }
 
