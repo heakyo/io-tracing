@@ -122,28 +122,29 @@ char ***groupAnagrams(char **strs, int strsSize, int *returnSize, int **returnCo
 	char ***grpTmp;
 	int *columnTmp;
 	int *columnSizes, *columnCaps;
+	int *p;
 	int signature[26];
-	int grpIndex, colmIndex, index, grpCap;
+	int grpNextIndex, colmNextIndex, index, grpCap;
 	int i;
 	char **grpColTmp;
 
-	grpIndex = 0;
-	index = 0;
+	grpNextIndex = 0;
 	grpCap = 1;
+	index = 0;
 
 	if (strsSize == 0)
 		goto exit;
 
 	grpAnagrams = calloc(grpCap, sizeof(char **));
 	if (!grpAnagrams)
-		return NULL;
+		goto exit;
 
 	columnCaps = calloc(grpCap, sizeof(int));
 	if (!columnCaps)
 		goto columnCaps_alloc_failed;
-	columnCaps[grpIndex]++;
+	columnCaps[grpNextIndex]++;
 
-	columnSizes = calloc(columnCaps[0], sizeof(int));
+	columnSizes = calloc(grpCap, sizeof(int));
 	if (!columnSizes)
 		goto columnSizes_alloc_failed;
 
@@ -157,27 +158,27 @@ char ***groupAnagrams(char **strs, int strsSize, int *returnSize, int **returnCo
 		getSignature(strs[i], signature);
 
 		if (hash_find(ht, signature, &index)) {
-			colmIndex = columnSizes[index];
-			if (colmIndex >= columnCaps[index]) {
+			colmNextIndex = columnSizes[index];
+			if (colmNextIndex >= columnCaps[index]) {
 
 				grpColTmp = realloc(grpAnagrams[index], (columnCaps[index]<<1) * sizeof(char *));
 				if (!grpColTmp)
 					goto alloc_failed;
 				grpAnagrams[index] = grpColTmp;
-				memset(grpAnagrams[index] + columnSizes[index], 0x0, columnCaps[index] * sizeof(char *));
+				memset(grpAnagrams[index] + columnCaps[index], 0x0, columnCaps[index] * sizeof(char *));
 
 				columnCaps[index] <<= 1;
 			}
-			grpAnagrams[index][colmIndex] = strs[i];
+			grpAnagrams[index][colmNextIndex] = strs[i];
 			columnSizes[index]++;
 
 			continue;
 		}
 
-		if (hash_insert(ht, signature, grpIndex) != 0)
+		if (hash_insert(ht, signature, grpNextIndex) != 0)
 			goto alloc_failed;
 
-		if (grpIndex >= grpCap) {
+		if (grpNextIndex >= grpCap) {
 			grpTmp = realloc(grpAnagrams, (grpCap<<1) * sizeof(char **));
 			if (!grpTmp)
 				goto alloc_failed;
@@ -188,8 +189,11 @@ char ***groupAnagrams(char **strs, int strsSize, int *returnSize, int **returnCo
 			if (!columnTmp)
 				goto alloc_failed;
 			columnCaps = columnTmp;
-			memset(columnCaps + grpCap, 0x0, grpCap * sizeof(int));
-			columnCaps[grpIndex]++;
+			p = columnCaps + grpCap;
+			while (p < columnCaps + (grpCap<<1)) {
+				*p = 1;
+				p++;
+			}
 
 			columnTmp = realloc(columnSizes, (grpCap<<1) * sizeof(int));
 			if (!columnTmp)
@@ -200,13 +204,14 @@ char ***groupAnagrams(char **strs, int strsSize, int *returnSize, int **returnCo
 			grpCap <<= 1;
 		}
 
-		columnSizes[grpIndex]++;
-		grpAnagrams[grpIndex] = calloc(columnSizes[grpIndex], sizeof(char *));
-		if (!grpAnagrams[grpIndex])
+		grpAnagrams[grpNextIndex] = calloc(columnCaps[grpNextIndex], sizeof(char *));
+		if (!grpAnagrams[grpNextIndex])
 			goto alloc_failed;
-		grpAnagrams[grpIndex][0] = strs[i];
 
-		grpIndex++;
+		grpAnagrams[grpNextIndex][0] = strs[i];
+		columnSizes[grpNextIndex]++;
+
+		grpNextIndex++;
 	}
 
 	hash_destroy(ht);
@@ -214,12 +219,12 @@ char ***groupAnagrams(char **strs, int strsSize, int *returnSize, int **returnCo
 	free(columnCaps);
 
 	*returnColumnSizes = columnSizes;
-	*returnSize = grpIndex;
+	*returnSize = grpNextIndex;
 
 	return grpAnagrams;
 
 alloc_failed:
-	for (i = 0; i < grpIndex; i++)
+	for (i = 0; i < grpNextIndex; i++)
 		free(grpAnagrams[i]);
 	hash_destroy(ht);
 	free(columnSizes);
@@ -401,12 +406,11 @@ test_group_anagrams(void)
          */
         {
                 char *strs[] = {
-                        "eat", "tea", "tan",
-                        "ate", "nat" 
+                        "abc", "def", "ghi", "jkl"
                 };
 
-                run_group_anagrams_test("Test 1",
-                    strs, 5, 2);
+                run_group_anagrams_test("Test 5",
+                    strs, 4, 4);
         }
 #endif
 #if 1
